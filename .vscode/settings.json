@@ -1,0 +1,5 @@
+{
+    "python.formatting.provider": "yapf",
+    "editor.defaultFormatter": "ms-python.vscode-pylance",
+    "editor.formatOnSave": true
+}
