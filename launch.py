@@ -3,7 +3,7 @@ import time
 import mission
 import launch_utils as utils
 import pid
-import final_stage
+import archive.final_stage as final_stage
 
 # constants
 CLOCK_RATE = 10  # refresh rate [Hz]

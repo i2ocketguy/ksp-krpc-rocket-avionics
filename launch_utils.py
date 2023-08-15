@@ -72,6 +72,10 @@ def check_control(conn, vessel, root_vessel):
                         break
 
 def set_azimuth(vessel, target_incl, bref):
+
+    if target_incl == 0:
+        return 90.0
+
     rd2, d2r = math_conversion()
     azimuth = np.arcsin(
         np.cos(
@@ -109,13 +113,41 @@ def math_conversion():
 def launch_countdown(countdown_start=10, engine_start=None, vessel = None):
     for x in range(countdown_start, 0, -1):
         if x % 10 == 0:
-            print("T - %x" % int(x))
+            print("T - %d" % int(x))
         elif x < 10:
-            print("T - %x" % int(x))
+            print("T - %d" % int(x))
         if vessel is not None and engine_start is not None:
             if int(x) == engine_start:
                 vessel.control.activate_next_stage()
         time.sleep(1)
+
+def set_launch_ut(sc, target_time_str, engine_start=None, vessel = None):
+    YEAR_SECONDS = 9203545 - 1945
+    DAY_SECONDS = 21600
+
+    # Parse input string
+    parts = target_time_str.split(', ')
+    years = int(parts[0][1:]) - 1  # Subtract 1 because the game starts from year 1
+    days = int(parts[1][1:]) - 1   # Subtract 1 because the game starts from day 1
+    hms = list(map(int, parts[2].split(':')))
+    
+    # Convert to UT
+    target_ut = years * YEAR_SECONDS + days * DAY_SECONDS
+    target_ut += hms[0] * 3600 + hms[1] * 60 + hms[2]
+    
+    # Wait until the target time
+    while sc.ut < target_ut:
+
+        time_left = target_ut - sc.ut
+        x = int(time_left)
+        if x % 10 == 0:
+            print("T - %d" % int(x))
+        elif x < 10:
+            print("T - %d" % int(x))
+        if vessel is not None and engine_start is not None:
+            if int(x) == engine_start:
+                vessel.control.activate_next_stage()
+        time.sleep(1)  # adjust as needed
 
 def pad_separation(vessel):
     part = vessel.parts.with_tag("pad_separator")[0]

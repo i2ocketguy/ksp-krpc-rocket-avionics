@@ -23,4 +23,5 @@ class Telemetry():
         self.apoapsis = conn.add_stream(getattr, vessel.orbit, 'apoapsis_altitude')
         self.velocity = conn.add_stream(getattr, vessel.flight(vessel.orbit.body.reference_frame), 'speed')
         self.vertical_vel = conn.add_stream(getattr, vessel.flight(vessel.orbit.body.reference_frame), 'vertical_speed')
+        self.horizontal_vel = conn.add_stream(getattr, vessel.flight(vessel.orbit.body.reference_frame), 'horizontal_speed')
         self.periapsis = conn.add_stream(getattr, vessel.orbit, 'periapsis_altitude')

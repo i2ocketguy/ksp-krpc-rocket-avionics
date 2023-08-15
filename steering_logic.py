@@ -23,9 +23,6 @@ def roll_program(mission_params, telem, vessel, conn, sc):
                            mission_params, conn)
         pass
 
-    # time.sleep(0.5)
-    # vessel.auto_pilot.target_roll = mission_params.target_roll
-    # print(vessel.auto_pilot.roll_error,vessel.auto_pilot.target_roll)
     while telem.velocity() < 40 or telem.altitude() < 350 + \
             mission_params.altimeter_bias:
         utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
@@ -106,8 +103,7 @@ def maxQ(mission_params, telem, vessel, maxq_thrust_control):
 
 
 def max_accel(mission_params, telem, vessel, max_accel_thrust_control):
-    print(vessel.flight().g_force,
-          max_accel_thrust_control.update(vessel.flight().g_force))
+    #print(vessel.flight().g_force,max_accel_thrust_control.update(vessel.flight().g_force))
     #if vessel.flight().g_force >= mission_params.max_g:
     vessel.control.throttle = max_accel_thrust_control.update(
         vessel.flight().g_force)
@@ -115,9 +111,10 @@ def max_accel(mission_params, telem, vessel, max_accel_thrust_control):
 
 def meco(vessel, sc):
     vessel.control.throttle = 0
+    time.sleep(10 / sc.CLOCK_RATE)
     vessel.auto_pilot.disengage()
     print("MECO")
-    time.sleep(1 / sc.CLOCK_RATE)
+    time.sleep(10 / sc.CLOCK_RATE)
 
 def calculate_landing_burn(vessel):
 

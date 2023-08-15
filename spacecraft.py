@@ -1,7 +1,5 @@
 import krpc
 
-from final_stage import TELEM_RATE
-
 # Class that maintains a generic launch vehicle or spacecraft configuration
 class launch_vehicle():
     def __init__(self, vessel, CLOCK_RATE, root_vessel, altimeter_bias, v_stage, upper_stage_LF, payload_LF, meco_condition_multiplier, TELEM_RATE = None, is_abort_installed = False, abort_criteria = 0):

@@ -10,7 +10,8 @@ class PID:
             min_output,
             max_output,
             clamp=500,
-            deadband=0.01):
+            deadband=0.01,
+            rate_limit=None):
         self.Kp = P     # P, proportional, controls instantaneous error
         self.Ki = I     # I, integral, controls historic error
         self.Kd = D     # D, derivative, controls rate of change of error
@@ -25,6 +26,8 @@ class PID:
         self.deadband = deadband
         self.max_output = max_output
         self.min_output = min_output
+        self.rate_limit = rate_limit
+        self.last_output = 0.0
 
     def update(self, current_input):
         self.error = self.set_point - current_input
@@ -41,6 +44,14 @@ class PID:
 
         output = (self.Kp * self.P) + (self.Ki * self.I) - (self.Kd * self.D)
         output = self.clamp_output(output)
+
+        # If a rate limit is set and this is not the first output, apply the rate limit
+        if self.rate_limit is not None:
+            output_change = output - self.last_output
+            if abs(output_change) > self.rate_limit:
+                output = self.last_output + self.rate_limit * np.sign(output_change)
+
+        self.last_output = output
 
         return output
 
@@ -62,7 +73,12 @@ class PID:
         return integrator
 
     def update_derivative_term(self, dt, current_input):
-        return (current_input - self.last_input) / dt
+        if abs(self.Kd) > 0:
+            derivative = (current_input - self.last_input) / dt
+        else:
+            derivative = 0
+
+        return derivative
 
     def check_deadband(self):
         return abs(self.error) < self.deadband
