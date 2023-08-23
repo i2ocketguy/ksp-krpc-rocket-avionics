@@ -8,6 +8,69 @@ import matplotlib.pyplot as plt
 import steering_logic as steering
 import math
 from digitalfilter import low_pass_filter as LPF
+import numpy as np
+
+# TODO: 
+#       ADD Line-of-Sight navigation
+#       ADD PID control for roll and yaw
+
+def euler_step(vessel, h, v, dt):
+    h = h + v * dt
+    r = vessel.orbit.body.equatorial_radius + h 
+    Ft = 0 # coasting, no thrust
+    rho = 1.7185*np.exp(-2e-04*h)
+    Cd_A = 3.5 # kg/m^3
+    Fd =  0.5*rho*v**2*Cd_A
+    Fg = vessel.orbit.body.gravitational_parameter * vessel.mass / r**2
+    a = (Ft - Fd - Fg) / vessel.mass
+    v = v + a * dt
+
+    return h, v
+
+def compute_los_angle(current_position, target_position):
+    delta_x = target_position[0] - current_position[0]  # Change in latitude
+    delta_y = target_position[1] - current_position[1]   # Change in longitude
+    # print("target_position", target_position, "current_position:", current_position)
+    # print("delta_x:", delta_x, "delta_y:", delta_y)
+    los_angle = np.arctan2(-delta_y, delta_x)
+    # print("los_angle (radians):", los_angle)
+    return los_angle
+
+def corrected_compute_los_angle(current_position, target_position):
+    delta_y = target_position[0] - current_position[0]  # Change in latitude
+    delta_x = target_position[1] - current_position[1]   # Change in longitude
+    # print("target_position", target_position, "current_position:", current_position)
+    # print("delta_x:", delta_x, "delta_y:", delta_y)
+    los_angle = np.arctan2(delta_y, delta_x)
+    # print("los_angle (radians):", los_angle)
+    return los_angle
+
+def compute_los_rate(current_velocity, current_position, target_position):
+    los_angle = compute_los_angle(current_position, target_position)
+    los_angle = normalize_angle(np.degrees(los_angle))
+    vel_angle = np.arctan2(current_velocity[0], current_velocity[1])
+    vel_angle = normalize_angle(np.degrees(vel_angle))
+
+    # Compute shortest angle difference
+    los_rate = vel_angle - los_angle
+    # if los_rate >= 180: ******
+    #     los_rate -= 360
+    # elif los_rate < -180:
+    #     los_rate += 360
+
+    return los_rate
+
+def compass_heading(angle):
+    offset = 90
+    if angle > 180:
+        heading = normalize_angle(angle-offset)
+    else:
+        heading = normalize_angle(offset-angle)
+    
+    return heading
+
+def normalize_angle(angle):
+    return angle % 360
 
 # constants
 CLOCK_RATE = 50  # refresh rate [Hz]
@@ -26,9 +89,9 @@ v_stage = 100000  # velocity target for 45 degree pitch over
 conn, vessel = utils.initialize()
 mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
-                                           target_inc=-0.1,
+                                           target_inc=0,
                                            target_roll=180,
-                                           altimeter_bias=95,
+                                           altimeter_bias=71,
                                            grav_turn_end=85000,
                                            max_q=16000,
                                            max_g=3.0)
@@ -38,9 +101,12 @@ dcx = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
 mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   dcx.bref)
+target_lat = vessel.flight().latitude
+target_lon = vessel.flight().longitude
+landing_site = (target_lat, target_lon)
 
 # Pre-Launch
-utils.launch_countdown(10)
+utils.launch_countdown(3)
 vessel.control.activate_next_stage()  # Engine Ignition
 
 if vessel.available_thrust < 10:
@@ -64,28 +130,23 @@ time.sleep(3)
 vessel.control.gear = False
 
 # Wait until target alititude is achieved
-init_alt = telem.apoapsis()
-target_alt = 70000
-hmax = 0
-drag = 0
-g = 0
-y_peak = 0
-while telem.altitude() + 1.14*y_peak < target_alt+init_alt: 
-    #telem.apoapsis() - (telem.vertical_vel()*(g+(drag/vessel.mass))) < target_alt+init_alt: #telem.altitude()+hmax < target_alt:
-    #drag = vessel.flight().drag
-    #drag = math.sqrt(math.pow(drag[0],2)*0 + math.pow(drag[1],2)*0 + math.pow(drag[2],2))
-    g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
-    #hmax = math.pow(telem.velocity(),2)*math.pow(math.sin(vessel.flight().pitch),2)/(2*(g))
+target_alt = 75000
+dt = 1.0
+while True:
+    #predict future apoapsis
+    h_future = vessel.flight().mean_altitude
+    v_future = telem.vertical_vel() # np.linalg.norm(np.array(vessel.flight().velocity))
+    for _ in range(int(vessel.orbit.time_to_apoapsis/dt)):
+        h_old = h_future
+        h_future, v_future = euler_step(vessel, h_future, v_future, dt)
+        if h_future < h_old:
+            break
 
-    # Testing Quadratic Drag calculation for Peak Height
-    terminal_velocity = vessel.flight().terminal_velocity
-    tau = terminal_velocity/g
-    y_peak = -terminal_velocity*tau*(math.log(math.cos(math.atan(telem.velocity()/terminal_velocity))))
+    if h_future > target_alt:
+        vessel.control.throttle = 0.0
+        break
 
-    time.sleep(10/dcx.CLOCK_RATE)
-
-vessel.control.throttle = 0.0
-while telem.surface_altitude() < target_alt and telem.vertical_vel() > 10:
+while telem.vertical_vel() > 2:
     pass
 
 print("Passed %i, entering vertical velocity hold ..." % target_alt)
@@ -95,14 +156,13 @@ Tu = 300
 Ku = 2.5
 Kp = 0.2*Ku
 Ki = 2.0*Kp/Tu
-Kd = 0.0*Kp/Tu
+Kd = 2.0*Kp/Tu
 vert_vel_controller = pid.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
-vert_vel_controller.set_point = 0.02  # vertical velocity target, m/s
+vert_vel_controller.set_point = -0.02  # vertical velocity target, m/s
 alt_controller = pid.PID(.4, 0.005, 0.0, min_output=-20, max_output=10)
 alt_controller.set_point = telem.apoapsis()
 slam_controller = pid.PID(5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
 slam_controller.set_point = 0.5
-throttle_lpf = LPF(4,3,dcx.CLOCK_RATE)
 
 for thruster in vessel.parts.rcs:
     thruster.enabled = True
@@ -111,13 +171,11 @@ mode = 1
 status = vessel.situation.landed
 starting_time = time.time()
 throttle_update = starting_time
-count = 0
 burn_flag = False
 throttle_datastream = pu.data_stream_plot()
 altitude_datastream = pu.data_stream_plot()
 vertvel_datastream = pu.data_stream_plot()
 while vessel.situation != status:
-    count = count + 1
     elapsed_time = time.time() - starting_time
 
     # Mode 1 is hover at target altitude
@@ -126,37 +184,55 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
-        if int(elapsed_time) > 20:
+        if int(elapsed_time) > 10:
             vessel.control.throttle = 0.0
             mode = 2
             vessel.auto_pilot.stopping_time = (0.3, 0.3, 0.3)
             vessel.control.toggle_action_group(1)
-            vessel.auto_pilot.target_pitch = 5.0
+            vessel.auto_pilot.target_pitch = -10.0
             vessel.auto_pilot.target_roll = 0.0
             print("Exiting altitude hold ...")
             while telem.vertical_vel() > -20:
                 pass
             vessel.auto_pilot.stopping_time = (0.5, 0.3, 0.5)
+            roll_control = pid.PID(1.0, 0.1, 0.5, -30, 30)
+            yaw_control = pid.PID(0.1, 0.05, 0.1, -180, 180)
 
         
     
     # Mode 2 is descent and landing burn start calculation
     if mode == 2:
         tb = steering.calculate_landing_burn_time(vessel)
-        if telem.surface_altitude() < 4000:
+        if telem.surface_altitude() < 3000:
             for thruster in vessel.parts.rcs:
                 thruster.enabled = True
             vessel.auto_pilot.target_pitch = 90
+        else:
+            
+            # Compute line of sight angle to landing pad
+            current_position = (vessel.flight().latitude, vessel.flight().longitude)
+            heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
+
+            # Compute the rate of change of line of sight angle
+            current_velocity = vessel.flight(vessel.surface_reference_frame).velocity
+            yaw_error = compute_los_rate(current_velocity, current_position, landing_site)
+
+            # Update control input
+
+            print(heading)
+            vessel.auto_pilot.target_heading = heading
+
         if tb > -0.75 and telem.surface_altitude() < 8000 and burn_flag is False:
             vessel.control.throttle = slam_controller.update(tb)
             burn_flag = True
             vessel.auto_pilot.stopping_time = (0.2, 0.2, 0.2)
+
         if telem.surface_altitude() >= 50 and burn_flag is True:
                 vessel.control.throttle = slam_controller.update(tb)
-        if abs(telem.horizontal_vel()) > 20 and telem.surface_altitude() < 15000:
-            for thruster in vessel.parts.rcs:
-                thruster.enabled = True
-            vessel.auto_pilot.target_pitch = 90
+        # if abs(telem.horizontal_vel()) > 20 and telem.surface_altitude() < 15000:
+        #     for thruster in vessel.parts.rcs:
+        #         thruster.enabled = True
+        #     vessel.auto_pilot.target_pitch = 90
         if telem.surface_altitude() < 50 or telem.vertical_vel() > -5:
             mode = 3
             Tu = 225
