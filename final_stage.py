@@ -15,7 +15,7 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     Kp = 0.2*K1
     Ki = 2.0*K1/K2
     Kd = Kp*K2/3.0
-    if pid is None:
+    if pid_input is None:
         pitch_control = pid.PID(Kp,
                                 Ki,
                                 Kd,
@@ -35,11 +35,11 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     RKi = 2.0*K1/K2
     RKd = Kp*K2/3.0
     rate_control = pid.PID(RKp,
-                                RKi,
-                                RKd,
-                                -40,
-                                40,
-                                deadband=0.5)
+                            RKi,
+                            RKd,
+                            -40,
+                            40,
+                            deadband=0.5)
     rate_control.set_point = -0.2 # target veritcal velocity
 
     vessel.auto_pilot.engage()

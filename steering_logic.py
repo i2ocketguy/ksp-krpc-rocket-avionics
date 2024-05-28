@@ -208,3 +208,32 @@ def calc_pitch_and_roll(v1):
     rot_y = np.arctan2(v1[0], np.hypot(v1[1], v1[2]))
     pitch, heading = rot_x*180/np.pi, rot_y*180/np.pi
     return pitch, heading
+
+def compute_los_angle(current_position, target_position):
+    delta_y = target_position[0] - current_position[0]  # Change in latitude
+    delta_x = target_position[1] - current_position[1]   # Change in longitude
+    los_angle = np.arctan2(delta_y, delta_x)
+    return los_angle
+
+def compass_heading(angle):
+    offset = 90
+    if angle > 180:
+        heading = normalize_angle(angle-offset)
+    else:
+        heading = normalize_angle(offset-angle)
+    
+    return heading
+
+def normalize_angle(angle):
+    return angle % 360
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    r = 600000
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2-lat1)
+    delta_lambda = math.radians(lon2-lon1)
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    distance = r * c
+    return distance

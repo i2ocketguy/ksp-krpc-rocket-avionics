@@ -45,7 +45,7 @@ def test():
     ys = np.sin(2*np.pi * 1.0 * ts)  # signal @ 1.0 Hz, without noise
     yerr = 0.5 * np.random.normal(size=len(ts))  # Gaussian noise
     yraw = ys + yerr
-    live_lfilter = low_pass_filter(4, 2.5, 30)
+    live_lfilter = low_pass_filter(4, 1, 30)
     # simulate live filter - passing values one by one
     y_live_lfilter = [live_lfilter(y) for y in yraw]
 
