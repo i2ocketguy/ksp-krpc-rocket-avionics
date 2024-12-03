@@ -9,13 +9,12 @@ import steering_logic as steering
 from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
+import krpc
+import proportional_navigation as PN
 
-def initialize_test():
-    conn, vessel = utils.initialize()
-    test_hoverslam(conn, vessel)
+
 
 def test_part_with_tag(vessel):
-    # for part in vessel.parts.with_tag("pad-separator"):
     #     print(part.name)
         # part.docking_port.undock()
 
@@ -53,7 +52,7 @@ def test_retrograde_heading(conn, vessel):
 def test_hoverslam(conn, vessel):
     CLOCK_RATE = 50  # refresh rate [Hz]
     TELEM_RATE = 1  # refresh rate for telemetry aquistion [Hz]
-    root_vessel = "F9"
+    root_vessel = vessel.name
     mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
                                            target_inc=0,
@@ -65,7 +64,8 @@ def test_hoverslam(conn, vessel):
     vessel, telem = utils.check_active_vehicle(conn, vessel,
                                         mission_params.root_vessel)
     
-    landing_site = (-0.09720804982287173, -74.55761822488455)
+    # landing_site = (-0.09720804982287173, -74.55761822488455) # LC-1
+    landing_site = (0.00248536258708449, -74.712536691836)   # LZ-1
 
     # Create the hybrid reference frame
     body = vessel.orbit.body
@@ -82,18 +82,18 @@ def test_hoverslam(conn, vessel):
     Kp = 0.2*Ku
     Ki = 2.0*Kp/Tu
     Kd = 2.0*Kp/Tu
-    vert_vel_controller = pid.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
+    vert_vel_controller = pid.PID(0.0, Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
     vert_vel_controller.set_point = -0.02  # vertical velocity target, m/s
-    alt_controller = pid.PID(.4, 0.005, 0.0, min_output=-20, max_output=10)
+    alt_controller = pid.PID(0.0, .4, 0.005, 0.0, min_output=-20, max_output=10)
     alt_controller.set_point = telem.apoapsis()
-    slam_controller = pid.PID(5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
+    slam_controller = pid.PID(0.0, 5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
     slam_controller.set_point = 0.5
 
     vessel.auto_pilot.engage()
     vessel.auto_pilot.auto_tune = True
-    dist_controller = pid.PID(0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
+    dist_controller = pid.PID(0.0, 0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
     dist_controller.set_point = 0.0
-    hvel_controller = pid.PID(0.1, 0.01, 0.01, -20.0, 20.0, deadband=0.005)
+    hvel_controller = pid.PID(0.0, 0.1, 0.01, 0.01, -20.0, 20.0, deadband=0.005)
     mode = 2
     status = vessel.situation.landed
     starting_time = time.time()
@@ -162,18 +162,18 @@ def test_hoverslam(conn, vessel):
                 pitch_input = distance_pitch + velocity_pitch
                 # Update control input
                 vessel.auto_pilot.target_heading = heading
-                vessel.auto_pilot.target_pitch = pitch_lpf(90+pitch_input)
+                vessel.auto_pilot.target_pitch = pitch_lpf(90-pitch_input)
 
                 if distance_to_pad > prev_dist:
-                    vel_sign = -1
-                else: # distance_to_pad < prev_dist:
                     vel_sign = 1
+                else: # distance_to_pad < prev_dist:
+                    vel_sign = -1
 
                 prev_dist = distance_to_pad
 
                 print(f"{distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
 
-            if tb > -0.75 and telem.surface_altitude() < 8000 and burn_flag is False:
+            if tb > -0.75 and telem.surface_altitude() < 2800 and burn_flag is False:
                 vessel.control.throttle = slam_controller.update(tb)
                 burn_flag = True
                 vessel.auto_pilot.stopping_time = (1.2, 0.2, 0.2)
@@ -184,7 +184,7 @@ def test_hoverslam(conn, vessel):
             #     for thruster in vessel.parts.rcs:
             #         thruster.enabled = True
             #     vessel.auto_pilot.target_pitch = 90
-            if telem.surface_altitude() < 180 or telem.vertical_vel() > -5:
+            if telem.surface_altitude() < 380 or telem.vertical_vel() > -25:
                 mode = 3
                 Tu = 225
                 Ku = 2.5
@@ -195,9 +195,9 @@ def test_hoverslam(conn, vessel):
                 alt_controller.set_point = -5.0
                 alt_controller.set_max_output(-3.0)
                 alt_controller.set_min_output(-10.0)
-                hvel_controller.set_max_output(1.0)
-                hvel_controller.set_min_output(-1.0)
-                hvel_controller.update_gains(0.05, 0.005, 0.01)
+                hvel_controller.set_max_output(10.0)
+                hvel_controller.set_min_output(-10.0)
+                hvel_controller.update_gains(1.0, 0.005, 0.01)
 
         # Mode 3 is constant descent rate at -5 m/s
         if mode == 3:
@@ -209,7 +209,7 @@ def test_hoverslam(conn, vessel):
             v_vec = vessel.flight(ref_frame).velocity
             v_mag = np.linalg.norm(v_vec)
 
-            if vessel.flight(ref_frame).horizontal_speed > 2:
+            if vessel.flight(ref_frame).horizontal_speed > 1:
                 # Calculate the direction to apply thrust
                 retro_vec = -np.array(v_vec) / v_mag
                 # Use the PID controller to adjust the pointing vector
@@ -232,7 +232,7 @@ def test_hoverslam(conn, vessel):
                 vessel.auto_pilot.target_heading = heading
                 vessel.auto_pilot.target_roll = float('NaN')
 
-            print(f"{distance_to_pad:.2f}, {v_mag:.2f}, {pitch:.2f}, {heading:.2f}")
+            print(f"{distance_to_pad:.2f}, {v_mag:.2f}, {vessel.flight(ref_frame).horizontal_speed:.2f}, {pitch:.2f}")
 
         if int(time.time()) - int(throttle_update) > 5:  
             vert_vel_controller.set_min_output(new_throttle_limit)
@@ -245,5 +245,102 @@ def test_hoverslam(conn, vessel):
         vertvel_datastream.update_data_stream(elapsed_time, telem.vertical_vel())
 
         time.sleep(1/CLOCK_RATE)
+
+    vessel.control.throttle = 0.0
+
+def test_roll_control(conn, vessel):
+    landing_site = (-0.09720804982287173, -74.55761822488455)
+    status = vessel.situation.landed
+    roll_controller = pid.PID(1.0, 0.0, 0.1,-20, 20, 1.0)
+    roll_controller.set_point = 0.0
+    while vessel.situation != status:
+        current_position = (vessel.flight().latitude, vessel.flight().longitude)
+        heading = steering.compass_heading(np.degrees(steering.compute_los_angle(current_position, landing_site)))
+        current_heading = vessel.flight().heading
+        heading_error = steering.compute_heading_error(current_heading, heading)
+        roll_input = -1*roll_controller.update(heading_error)
+
+        print(f"{heading:.2f}, {heading_error:.2f}, {vessel.flight().roll:.2f}, {roll_input:.2f}")
+
+def time_to_go(_, vessel):
+    while True:
+        tb = steering.calculate_landing_burn_time(vessel)
+        print(tb)
+    
+def print_lat_lon(_, vessel):
+    target_lat = vessel.flight().latitude
+    target_lon = vessel.flight().longitude
+    landing_site = (target_lat, target_lon)
+    print(landing_site)
+
+def altitude_controller(conn, vessel):
+    Kp = 0.05
+    Ki = 0.01
+    Kd = 0.1
+    alt_controller = pid.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
+    alt_controller.set_point = 1000
+    vert_vel_controller = pid.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
+    vert_vel_controller.set_point = 0.0
+    vertical_vel = conn.add_stream(getattr, vessel.flight(vessel.orbit.body.reference_frame), 'vertical_speed')
+    while True:
+        current_alt = vessel.flight().mean_altitude
+        vert_vel_setpoint = alt_controller.update(current_alt)
+        vert_vel_controller.set_point = vert_vel_setpoint
+        pitch_cmd = vert_vel_controller.update(vertical_vel())
+        vessel.control.pitch = pitch_cmd
+        print(f"altitude_error:, {(current_alt-alt_controller.set_point):.2f}, vert: {vertical_vel():.2f},  pitch cmd: , {pitch_cmd:.2f}")
+        time.sleep(0.1)
+
+def test_guidance(conn, vessel):
+    # Initialize connection
+    target = conn.space_center.target_vessel
+    
+    # Create telemetry streams
+    flight = vessel.flight(vessel.surface_reference_frame)
+    target_flight = target.flight(vessel.surface_reference_frame)
+    
+    # Create guidance system
+    guidance = PN.ProportionalNavigationGuidance(vessel, target, conn)
+    
+    try:
+        guidance.start()
+        
+        while True:
+            # Get current guidance vector
+            vector = guidance.current_target_vector
+            fpa, heading_err, magnitude = guidance.vector_to_local_directions(vector)
+            
+            # Clear screen (works in most terminals)
+            print('\033[2J\033[H')
+            
+            # Print current state
+            print(f"Current Flight State:")
+            print(f"Altitude:     {flight.mean_altitude:8.1f} m")
+            print(f"Ground Speed: {flight.speed:8.1f} m/s")
+            print(f"Target Range: {guidance.get_target_range():8.1f} m")
+            
+            # Print guidance commands
+            print(f"\nGuidance Commands:")
+            print(f"{'↑' if fpa > 0 else '↓'} Pitch:    {abs(fpa):6.1f}°")
+            print(f"{'→' if heading_err > 0 else '←'} Heading:  {abs(heading_err):6.1f}°")
+            print(f"Magnitude: {magnitude:6.1f} m/s")
+            
+            # Print raw vector for debugging
+            print(f"\nRaw Vector [surface frame]:")
+            print(f"X: {vector[0]:8.2f}")
+            print(f"Y: {vector[1]:8.2f}")
+            print(f"Z: {vector[2]:8.2f}")
+            
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\nTest ended by user")
+    finally:
+        guidance.stop()
+
+def initialize_test():
+    _conn, vessel = utils.initialize()
+    # time_to_go(conn, vessel)
+    test_hoverslam(_conn, vessel)
 
 initialize_test()

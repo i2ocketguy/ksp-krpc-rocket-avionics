@@ -20,7 +20,7 @@ class low_pass_filter:
         raise NotImplementedError("Derived class must implement _process")
 
 class low_pass_filter(low_pass_filter):
-    def __init__(self, order = 4, fc = 2, clock_rate = 10):
+    def __init__(self, order = 4, fc = 2, clock_rate = 10.0):
         self.b, self.a = scipy.signal.iirfilter(order, fc, fs=clock_rate, btype="low", ftype="butter")
         self._xs = deque([0] * len(self.b), maxlen=len(self.b))
         self._ys = deque([0] * (len(self.a) - 1), maxlen=len(self.a)-1)
@@ -45,7 +45,7 @@ def test():
     ys = np.sin(2*np.pi * 1.0 * ts)  # signal @ 1.0 Hz, without noise
     yerr = 0.5 * np.random.normal(size=len(ts))  # Gaussian noise
     yraw = ys + yerr
-    live_lfilter = low_pass_filter(4, 1, 30)
+    live_lfilter = low_pass_filter(4, 1, 10.0)
     # simulate live filter - passing values one by one
     y_live_lfilter = [live_lfilter(y) for y in yraw]
 

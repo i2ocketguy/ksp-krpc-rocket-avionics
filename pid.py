@@ -4,6 +4,7 @@ import numpy as np
 class PID:
     def __init__(
             self,
+            set_point,
             P,
             I,
             D,
@@ -19,7 +20,7 @@ class PID:
         self.P = 0.0
         self.I = 0.0
         self.D = 0.0
-        self.set_point = 0.0    # value we are trying to track
+        self.set_point = set_point    # value we are trying to track
         self.last_input = 0.0
         self.last_time = time.time()
         self.error = 0

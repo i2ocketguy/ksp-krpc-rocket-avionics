@@ -2,7 +2,7 @@ import krpc
 
 # Class that maintains a generic launch vehicle or spacecraft configuration
 class launch_vehicle():
-    def __init__(self, vessel, CLOCK_RATE, root_vessel, altimeter_bias, v_stage, upper_stage_LF, payload_LF = 0, meco_condition_multiplier = 0, TELEM_RATE = None, is_abort_installed = False, abort_criteria = 0):
+    def __init__(self, vessel, CLOCK_RATE, root_vessel, altimeter_bias, v_stage, upper_stage_LF, payload_LF = 0, meco_condition_multiplier = 0, TELEM_RATE = None, is_abort_installed = False, abort_criteria = 10):
         self.is_abort_installed = is_abort_installed
         self.abort_criteria = abort_criteria
         self.upper_stage_LF = upper_stage_LF

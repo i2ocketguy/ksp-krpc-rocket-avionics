@@ -58,21 +58,21 @@ sts = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
 mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   sts.bref)
-maxq_thrust_control = pid.PID(0.001,
+maxq_thrust_control = pid.PID(mission_params.max_q,
+                                  0.001,
                                   0.0001,
                                   0.00003,
                                   0.5,
                                   1.0,
                                   clamp=mission_params.max_q)
-maxq_thrust_control.set_point = mission_params.max_q
-max_accel_thrust_control = pid.PID(0.1,
+max_accel_thrust_control = pid.PID(mission_params.max_g,
+                                       0.1,
                                        0.4,
                                        0.05,
                                        0.5,
                                        1.0,
                                        deadband=0.001,
                                        clamp=mission_params.max_g)
-max_accel_thrust_control.set_point = mission_params.max_g
 
 # Pre-Launch
 vessel.control.sas = True

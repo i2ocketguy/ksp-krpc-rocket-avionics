@@ -17,17 +17,18 @@ def roll_program(mission_params, telem, vessel, conn, sc):
     vessel.auto_pilot.target_pitch_and_heading(89,
                                                mission_params.target_heading)
     vessel.auto_pilot.target_roll = mission_params.target_roll
+    # vessel.auto_pilot.wait()
     while telem.velocity() < 20 or telem.surface_altitude() < (
             220 + mission_params.altimeter_bias):
         utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
-                           mission_params, conn)
+                           mission_params, conn, "KRV Shuttle")
         pass
 
-    while telem.velocity() < 40 or telem.altitude() < 350 + \
-            mission_params.altimeter_bias:
-        utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
-                           mission_params, conn)
-        pass
+    # while telem.velocity() < 40 or telem.altitude() < 350 + \
+    #         mission_params.altimeter_bias:
+    #     utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
+    #                        mission_params, conn)
+    #     pass
     time.sleep(1 / sc.CLOCK_RATE)
 
 
@@ -237,3 +238,12 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     distance = r * c
     return distance
+
+def compute_heading_error(current_heading, target_heading):
+    error = target_heading - current_heading
+    if error > 180:
+        error -= 360
+    elif error < -180:
+        error += 360
+    return error
+

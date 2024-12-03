@@ -154,13 +154,13 @@ def pad_separation(vessel):
     part.docking_port.undock()
     print("Lift Off!")
 
-def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn):
+def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle):
     if is_abort_installed:
-        abort_trigger_check(abort_criteria, vessel, mission_params, conn)
+        abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle)
     else:
         pass
 
-def abort_trigger_check(abort_criteria, vessel, mission_params, conn):
+def abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle):
     # TODO: check abort activation
     #  check crtieria surpassed
     #  if crtieria surpassed, abort
@@ -168,25 +168,14 @@ def abort_trigger_check(abort_criteria, vessel, mission_params, conn):
         vessel.control.abort = True
         vessel.control.throttle = 1
         print("Launch Abort: Abort criteria exceeded")
-        abort_steering(vessel, mission_params, conn)
+        abort_steering(vessel, mission_params, conn, crew_vehicle)
 
-def abort_steering(vessel, mission_params, conn):
-    vessel = check_active_vehicle(conn, vessel, mission_params.root_vessel)
-
-    # abort_pitch_controller = pid.PID(
-    #     1,
-    #     0.1,
-    #     0.01,
-    #     360,
-    #     -360)
-    # abort_pitch_controller.set_point = vessel.flight().pitch
-
-    # vessel.auto_pilot.engage()
-    # vessel.auto_pilot.auto_tune = True
-    # vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch, vessel.flight().heading)
-    # time.sleep(1)
+def abort_steering(vessel, mission_params, conn, crew_vehicle):
     vessel.auto_pilot.disengage()
-    vessel.control.sas = True
+    vessel, telem = check_active_vehicle(conn, vessel, crew_vehicle)
+    vessel.auto_pilot.engage()
+    vessel.auto_pilot.target_pitch = 65
+    vessel.control.rcs = True
     time.sleep(0.5)
     while vessel.thrust > 0:
         pass
@@ -194,8 +183,12 @@ def abort_steering(vessel, mission_params, conn):
     if vessel.thrust <= 0:
         for port in vessel.parts.docking_ports:
             if port.state == conn.space_center.DockingPortState.docked:
+                vessel.auto_pilot.disengage()
                 vessel = port.undock()
-                vessel = check_active_vehicle(conn, vessel, mission_params.root_vessel)
+                vessel, _ = check_active_vehicle(conn, vessel, crew_vehicle)
+                vessel.control.rcs = True
+                vessel.control.sas = True
+                time.sleep(0.5)
                 quit()
     else:
         quit()

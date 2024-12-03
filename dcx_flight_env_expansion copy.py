@@ -9,6 +9,8 @@ import steering_logic as steering
 from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
+from flightcontroller import FlightController, ReferenceMode
+import threading
 
 def euler_step(vessel, h, v, dt):
     h = h + v * dt
@@ -23,15 +25,6 @@ def euler_step(vessel, h, v, dt):
 
     return h, v
 
-def compute_los_angle(current_position, target_position):
-    delta_x = target_position[0] - current_position[0]  # Change in latitude
-    delta_y = target_position[1] - current_position[1]   # Change in longitude
-    # print("target_position", target_position, "current_position:", current_position)
-    # print("delta_x:", delta_x, "delta_y:", delta_y)
-    los_angle = np.arctan2(-delta_y, delta_x)
-    # print("los_angle (radians):", los_angle)
-    return los_angle
-
 def corrected_compute_los_angle(current_position, target_position):
     delta_y = target_position[0] - current_position[0]  # Change in latitude
     delta_x = target_position[1] - current_position[1]   # Change in longitude
@@ -40,21 +33,6 @@ def corrected_compute_los_angle(current_position, target_position):
     los_angle = np.arctan2(delta_y, delta_x)
     # print("los_angle (radians):", los_angle)
     return los_angle
-
-def compute_los_rate(current_velocity, current_position, target_position):
-    los_angle = compute_los_angle(current_position, target_position)
-    los_angle = normalize_angle(np.degrees(los_angle))
-    vel_angle = np.arctan2(current_velocity[0], current_velocity[1])
-    vel_angle = normalize_angle(np.degrees(vel_angle))
-
-    # Compute shortest angle difference
-    los_rate = vel_angle - los_angle
-    # if los_rate >= 180: ******
-    #     los_rate -= 360
-    # elif los_rate < -180:
-    #     los_rate += 360
-
-    return los_rate
 
 def compass_heading(angle):
     offset = 90
@@ -116,8 +94,8 @@ dcx = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
 mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   dcx.bref)
-target_lat = vessel.flight().latitude
-target_lon = vessel.flight().longitude
+target_lat = -0.09715686478263831
+target_lon = -74.55776548288372
 landing_site = (target_lat, target_lon)
 
 # Create the hybrid reference frame
@@ -128,16 +106,26 @@ ref_frame = conn.space_center.ReferenceFrame.create_hybrid(
     velocity=body.reference_frame
 )
 
+controller = FlightController()
+control_active = [True]
+desired_direction = [np.array([0.0, 1.0, 0.0])]  # Initial vertical orientation
+control_mode = [ReferenceMode.SURFACE]
+
+# Start control thread
+control_thread = threading.Thread(
+    target=controller.control_loop,
+    args=(control_active, desired_direction, control_mode)
+)
+control_thread.start()
+
 # Pre-Launch
-utils.launch_countdown(10)
+utils.launch_countdown(1)
 vessel.control.activate_next_stage()  # Engine Ignition
 
 if vessel.available_thrust < 10:
     for engine in vessel.parts.engines:
         engine.active = True
 
-vessel.auto_pilot.engage()
-vessel.auto_pilot.auto_tune = True
 throttle_limit = utils.throttle_from_twr(vessel, 1.5)
 vessel.control.throttle = throttle_limit
 vessel.control.sas = True
@@ -146,14 +134,20 @@ vessel, telem = utils.check_active_vehicle(conn, vessel,
                                            mission_params.root_vessel)
 time.sleep(100/dcx.CLOCK_RATE)
 vessel.control.toggle_action_group(1)
-vessel.auto_pilot.target_pitch_and_heading(87.0, mission_params.target_heading)
-vessel.auto_pilot.wait()
-# time.sleep(200/dcx.CLOCK_RATE)
-# vessel.auto_pilot.target_roll = vessel.flight(ref_frame).roll
+# Instead of using autopilot directly
+azimuth = utils.set_azimuth(vessel, mission_params.target_inc, dcx.bref)
+# Convert pitch/heading to direction vector
+pitch_rad = np.radians(0)
+heading_rad = np.radians(azimuth)
+desired_direction[0] = np.array([
+    np.sin(pitch_rad) * np.cos(heading_rad),
+    np.cos(pitch_rad),
+    np.sin(pitch_rad) * np.sin(heading_rad)
+])
 vessel.control.gear = False
 
 # Wait until target alititude is achieved
-target_alt = 68000
+target_alt = 5000
 dt = 0.5
 while True:
     #predict future apoapsis
@@ -169,13 +163,9 @@ while True:
         vessel.control.throttle = 0.0
         break
 
-    # tweak = 0.90 # fudge factor for strength of drag correction, probably somewhere in the 0.9 - 1.0 range is most accurate
-    # scale_h = 5600.0 * vessel.orbit.body.atmosphere_depth / 70000.0 # rough atmosphere 1/e scale height in m
-    # drag = vessel.flight().drag
-    # d_loss = tweak * scale_h * sqrt(drag[0]*drag[0] + drag[1]*drag[1] + drag[2]*drag[2]) # energy loss to drag in J
-    # h_future = 1.0/(1.0/vessel.orbit.apoapsis + d_loss/(vessel.orbit.body.gravitational_parameter * vessel.mass)) - vessel.orbit.body.equatorial_radius
+    print(f"Direction vector: {desired_direction[0]}")
+    print(f"Pitch: {np.degrees(pitch_rad)}°, Heading: {np.degrees(heading_rad)}°")
 
-    # print(h_future)
 
 while telem.vertical_vel() > 2:
     time.sleep(10/dcx.CLOCK_RATE)
@@ -196,9 +186,12 @@ alt_controller.set_point = telem.apoapsis()
 slam_controller = pid.PID(0.0, 5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
 slam_controller.set_point = 0.5
 roll_controller = pid.PID(0.0, 1.0, 0.0, 0.1,-20, 20, 1.0)
+roll_controller.set_point = 0.0
+
 dist_controller = pid.PID(0.0, 0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
-hvel_controller = pid.PID(0.0, 0.2, 0.01, 0.01, -60.0, 60.0, deadband=0.005)
-hvel_controller.set_point = 10.0
+dist_controller.set_point = 0.0
+hvel_controller = pid.PID(0.0, 0.2, 0.01, 0.01, -30.0, 30.0, deadband=0.005)
+hvel_controller.set_point = 60.0
 
 for thruster in vessel.parts.rcs:
     thruster.enabled = True
@@ -212,6 +205,11 @@ burn_start_flag = False
 throttle_datastream = pu.data_stream_plot()
 altitude_datastream = pu.data_stream_plot()
 vertvel_datastream = pu.data_stream_plot()
+horizontal_dist = pu.data_stream_plot()
+horizontal_vel = pu.data_stream_plot()
+pitch_log = pu.data_stream_plot()
+current_horizontal_velocity = 0
+pitch_input = 0
 distance_to_pad = 10000
 pitch_lpf = LPF(4,1,10.0)
 prev_dist = 0
@@ -225,13 +223,13 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
-        if int(elapsed_time) > 1:
+        if int(elapsed_time) > 10:
             vessel.control.throttle = 0.0
             mode = 2
             vessel.auto_pilot.stopping_time = (0.3, 0.3, 0.3)
-            vessel.control.toggle_action_group(1)
-            vessel.auto_pilot.target_pitch = -10.0
-            vessel.auto_pilot.target_roll = 45.0
+            # vessel.control.toggle_action_group(1)
+            vessel.auto_pilot.target_pitch = 80.0
+            vessel.auto_pilot.target_roll = float("NaN")
             print("Exiting altitude hold ...")
             while telem.vertical_vel() > -10:
                 pass
@@ -240,7 +238,7 @@ while vessel.situation != status:
     # Mode 2 is descent and landing burn start calculation
     if mode == 2:
         tb = steering.calculate_landing_burn_time(vessel)
-        if telem.surface_altitude() < 1500 or distance_to_pad < 100:
+        if distance_to_pad < 300:
             if vessel.thrust > 0:
                 burn_start_flag = True
 
@@ -259,7 +257,7 @@ while vessel.situation != status:
             pitch_input = distance_pitch + velocity_pitch
 
             # Update heading based on engine thrust status
-            if burn_start_flag is False or abs(vessel.flight(ref_frame).vertical_speed) > 50 :
+            if burn_start_flag is False or abs(vessel.flight(ref_frame).vertical_speed) > 110 :
                 heading += 180
                 if heading > 360:
                     heading -= 360
@@ -274,12 +272,21 @@ while vessel.situation != status:
                 vel_sign = 1
 
             prev_dist = distance_to_pad
+            if tb > -0.75 and telem.surface_altitude() < 5000 and burn_flag is False:
+                vessel.control.throttle = slam_controller.update(tb)
+                burn_flag = True
+                vessel.auto_pilot.stopping_time = (1.2, 0.2, 0.2)
 
+            if telem.surface_altitude() >= 50 and burn_flag is True:
+                vessel.control.throttle = slam_controller.update(tb)
+            
             print(f"Mode 2a Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
 
         else:
             
             # Compute line of sight angle to landing pad
+            throttle_limit = utils.throttle_from_twr(vessel, 1.0)
+            vessel.control.throttle = throttle_limit
             current_position = (vessel.flight().latitude, vessel.flight().longitude)
             heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
@@ -291,10 +298,7 @@ while vessel.situation != status:
             pitch_input = distance_pitch + velocity_pitch
             # Update control input
             vessel.auto_pilot.target_heading = heading
-            if telem.horizontal_vel() > 50 and distance_to_pad < 1500:
-                vessel.auto_pilot.target_pitch = 70.0
-            else:
-                vessel.auto_pilot.target_pitch = pitch_lpf(pitch_input)
+            vessel.auto_pilot.target_pitch = pitch_lpf(90+pitch_input)
 
             if distance_to_pad > prev_dist:
                 vel_sign = -1
@@ -313,14 +317,6 @@ while vessel.situation != status:
                 vessel.auto_pilot.target_roll = roll_input
 
             print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel.flight().roll:.2f} {roll_input:.2f}")
-
-        if tb > -0.75 and telem.surface_altitude() < 8000 and burn_flag is False:
-            vessel.control.throttle = slam_controller.update(tb)
-            burn_flag = True
-            vessel.auto_pilot.stopping_time = (1.2, 0.2, 0.2)
-
-        if telem.surface_altitude() >= 50 and burn_flag is True:
-                vessel.control.throttle = slam_controller.update(tb)
 
         if telem.surface_altitude() < 120 or telem.vertical_vel() > -5:
             mode = 3
@@ -395,7 +391,9 @@ while vessel.situation != status:
     throttle_datastream.update_data_stream(elapsed_time, vessel.control.throttle)
     altitude_datastream.update_data_stream(elapsed_time, telem.altitude())
     vertvel_datastream.update_data_stream(elapsed_time, telem.vertical_vel())
-
+    horizontal_dist.update_data_stream(elapsed_time, distance_to_pad)
+    horizontal_vel.update_data_stream(elapsed_time, current_horizontal_velocity)
+    pitch_log.update_data_stream(elapsed_time, pitch_input)
     time.sleep(1/dcx.CLOCK_RATE)
 
 vessel.control.throttle = 0.0
@@ -404,7 +402,7 @@ time.sleep(10/dcx.CLOCK_RATE)
 vessel.control.rsc = False
 time.sleep(10/dcx.CLOCK_RATE)
 vessel.control.sas = True
-# throttle_datastream.plot()
-# altitude_datastream.plot()
-# vertvel_datastream.plot()
-# plt.show()
+horizontal_dist.plot()
+horizontal_vel.plot()
+pitch_log.plot()
+plt.show()
