@@ -3,6 +3,9 @@ import time
 import numpy as np
 import math
 import pid
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
 
 # Consists of functions for steering and controlling a generic launch vehicle.
 # - Pitch Maneuver
@@ -10,10 +13,10 @@ import pid
 # - MaxQ throttle
 # - constant acceleration
 
-def roll_program(mission_params, telem, vessel, conn, sc):
+def roll_program(mission_params, telem, vessel, conn, sc, telem_viz: KSPTelemetry):
     # roll program after velocity reached based on TWR
     # heading angle
-    print("Entering Roll Program")
+    enter_control_mode(ControlMode.ROLL, telem_viz)
     vessel.auto_pilot.target_pitch_and_heading(89,
                                                mission_params.target_heading)
     vessel.auto_pilot.target_roll = mission_params.target_roll
@@ -21,7 +24,7 @@ def roll_program(mission_params, telem, vessel, conn, sc):
     while telem.velocity() < 20 or telem.surface_altitude() < (
             220 + mission_params.altimeter_bias):
         utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
-                           mission_params, conn, "KRV Shuttle")
+                           mission_params, conn, "KRV Shuttle", telem_viz)
         pass
 
     # while telem.velocity() < 40 or telem.altitude() < 350 + \
@@ -87,17 +90,19 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
 
         time.sleep(1 / sc.CLOCK_RATE)
 
-def maxQ(mission_params, telem, vessel, maxq_thrust_control):
+def maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz: KSPTelemetry):
     if vessel.flight().dynamic_pressure >= 10000 and telem.altitude() < 12000:
         vessel.control.throttle = maxq_thrust_control.update(
             vessel.flight().dynamic_pressure)
         if not mission_params.maxq_enter:
-            print("MaxQ - Entering Throttle Bucket")
+            enter_control_mode(ControlMode.MAX_Q, telem_viz)
+            # print("MaxQ - Entering Throttle Bucket")
             mission_params.maxq_enter = True
     elif telem.altitude() >= 12000:
         vessel.control.throttle = 1
         if not mission_params.maxq_exit:
-            print("Exiting MaxQ - Throttle Up 1st Stage")
+            enter_control_mode(ControlMode.THROTTLE_BUCKET_EXIT, telem_viz)
+            # print("Exiting MaxQ - Throttle Up 1st Stage")
             mission_params.maxq_exit = True
     else:
         vessel.control.throttle = 1
@@ -110,11 +115,13 @@ def max_accel(mission_params, telem, vessel, max_accel_thrust_control):
         vessel.flight().g_force)
 
 
-def meco(vessel, sc):
+def meco(vessel, sc, telem_viz):
     vessel.control.throttle = 0
     time.sleep(10 / sc.CLOCK_RATE)
     vessel.auto_pilot.disengage()
-    print("MECO")
+
+    enter_control_mode(ControlMode.MECO, telem_viz)
+    # print("MECO")
     time.sleep(10 / sc.CLOCK_RATE)
 
 def calculate_landing_burn(vessel):

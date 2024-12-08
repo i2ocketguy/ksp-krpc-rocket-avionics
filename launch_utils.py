@@ -1,10 +1,32 @@
 import os
+from enum import Enum
 
 import krpc
 import numpy as np
 import time
 import pid
 import mission
+from telemetry import KSPTelemetry
+
+CONTROL_MODE = "control_mode"
+class ControlMode(str, Enum):
+    PAD = "Pad Flight Computer Boot"
+    ROLL = "Roll Program"
+    PITCH_OVER = "Pitch Over Maneuver"
+    MAX_Q = "MaxQ Throttle Bucket"
+    THROTTLE_BUCKET_EXIT = "Throttle Bucket Exit"
+    MECO_PREP = "Stabilizing Pitch for MECO"
+    MECO = "MECO"
+    S2_INIT = "Stage 2 Init"
+    S2_LOOP1 = "Second Stage Control Loop 1"
+    S2_LOOP2 = "Second Stage Control Loop 2"
+    S2_LOOP3 = "Second Stage Control Loop 3"
+    COAST = "Coast"
+    ABORT = "Abort"
+
+
+def enter_control_mode(mode: ControlMode, telem_viz: KSPTelemetry, console_out: bool = True):
+    telem_viz.publish_enum_metric(CONTROL_MODE, mode.name, mode.value, console_out)
 
 
 def initialize():
@@ -156,19 +178,20 @@ def pad_separation(vessel):
     part.docking_port.undock()
     print("Lift Off!")
 
-def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle):
+def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry):
     if is_abort_installed:
-        abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle)
+        abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz)
     else:
         pass
 
-def abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle):
+def abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry):
     # TODO: check abort activation
     #  check crtieria surpassed
     #  if crtieria surpassed, abort
     if vessel.auto_pilot.pitch_error > abort_criteria or vessel.control.abort is True:
         vessel.control.abort = True
         vessel.control.throttle = 1
+        enter_control_mode(ControlMode.ABORT, telem_viz)
         print("Launch Abort: Abort criteria exceeded")
         abort_steering(vessel, mission_params, conn, crew_vehicle)
 
