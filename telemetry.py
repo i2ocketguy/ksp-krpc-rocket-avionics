@@ -14,34 +14,33 @@ class KSPTelemetry:
 
     def __init__(self):
         # Define your metrics here
-        self.altitude_gauge = Gauge('rocket_altitude_meters', 'Current altitude of the rocket in meters')
-        self.velocity_gauge = Gauge('rocket_velocity_m_s', 'Current velocity of the rocket in meters per second')
-        self.throttle_gauge = Gauge('rocket_throttle', 'Current throttle setting (0.0 to 1.0)')
-        # You can add more metrics as needed, like fuel mass, stage number, pitch, yaw, roll, etc.
+        self.surface_altitude = Gauge('surface_altitude', 'surface_altitude in meters')
+        self.altitude = Gauge('altitude', 'altitude in meters')
+        self.apoapsis = Gauge('apoapsis', 'apoapsis in meters')
+        self.velocity = Gauge('velocity', 'velocity in meters per second')
+        self.vertical_vel = Gauge('vertical_vel', 'vertical_vel in meters per second')
+        self.horizontal_vel = Gauge('horizontal_vel', 'horizontal_vel in meters per second')
+        self.periapsis = Gauge('periapsis', 'periapsis in meters')
 
 
     def start_metrics_server(self, port: int = 8012):
         # todo some kind of lock or better error handling here if this class is instantiated > once
         start_http_server(port)
 
+
     def start_telem_publish(self, telemetry: Telemetry):
-        updater_thread = threading.Thread(target=self.telem_publish_thread, args=(telemetry,), daemon=True)
+        updater_thread = threading.Thread(target=self._telem_publish_thread, args=(telemetry,), daemon=True)
         updater_thread.start()
 
 
-    def telem_publish_thread(self, telemetry: Telemetry):
+    def _telem_publish_thread(self, telemetry: Telemetry):
         while True:
-            # todo real telem in next iteration
-            # In a real application, these would come from the rocket's control system logic
-            altitude = random.uniform(0, 100000)  # altitude in meters
-            velocity = random.uniform(0, 2000)  # velocity in m/s
-            throttle = random.uniform(0, 1)  # throttle setting
+            self.surface_altitude.set(telemetry.surface_altitude())
+            self.altitude.set(telemetry.altitude())
+            self.apoapsis.set(telemetry.apoapsis())
+            self.velocity.set(telemetry.velocity())
+            self.vertical_vel.set(telemetry.vertical_vel())
+            self.horizontal_vel.set(telemetry.horizontal_vel())
+            self.periapsis.set(telemetry.periapsis())
 
-            self.update_metrics(altitude, velocity, throttle)
-
-            time.sleep(1)
-
-    def update_metrics(self, altitude: float, velocity: float, throttle: float):
-            self.altitude_gauge.set(altitude)
-            self.velocity_gauge.set(velocity)
-            self.throttle_gauge.set(throttle)
+            time.sleep(0.5)
