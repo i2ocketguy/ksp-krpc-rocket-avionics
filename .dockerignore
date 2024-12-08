@@ -1,0 +1,6 @@
+infra
+.venv
+.vscode
+.dockerignore
+.gitignore
+README.md
