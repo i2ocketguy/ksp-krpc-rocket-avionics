@@ -1,3 +1,5 @@
+import os
+
 import krpc
 import numpy as np
 import time
@@ -12,7 +14,7 @@ def initialize():
 
 
 def create_instance():
-    return krpc.connect(name='Launch')
+    return krpc.connect(name='Launch', address=os.environ.get('KRPC_ADDRESS', '127.0.0.1')) # todo add this to all instances like this
 
 
 def initialize_active_vessel(conn):

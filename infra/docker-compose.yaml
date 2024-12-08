@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../
+      dockerfile: infra/Dockerfile
+    container_name: ksp_telemetry_app
+#    ports:
+#      - "8012:8012"
+    network_mode: host
+#    networks:
+#      - telemetry_net
+    # add internal gateway host to access host krpc server, see also https://stackoverflow.com/a/62431165
+#    extra_hosts:
+#      - host.docker.internal:host-gateway
+    environment:
+#      KRPC_ADDRESS: host.docker.internal
+      PYTHONUNBUFFERED: 1
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+#    ports:
+#      - "9090:9090"
+    network_mode: host
+#    networks:
+#      - telemetry_net
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+#    ports:
+#      - "3000:3000"
+    network_mode: host
+#    networks:
+#      - telemetry_net
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # for simplicity, in real use set a stronger password
+
+#networks:
+#  telemetry_net:

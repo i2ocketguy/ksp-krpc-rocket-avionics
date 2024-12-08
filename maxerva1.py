@@ -6,6 +6,10 @@ import time
 import steering_logic as sas
 import numpy as np
 import final_stage
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
 
 def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
                    maxq_thrust_control, max_accel_thrust_control, apoapsis_limit=None):
@@ -121,7 +125,7 @@ vessel.control.activate_next_stage()  # pad sep
 time.sleep(3)
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                                mission_params.root_vessel)
-
+telem_viz.start_telem_publish(telem)
 vessel.auto_pilot.engage()
 # vessel.auto_pilot.stopping_time = (0.1, 0.2, .6)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
