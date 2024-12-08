@@ -9,6 +9,15 @@ import steering_logic as steering
 import math
 from digitalfilter import low_pass_filter as LPF
 
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
+
 # constants
 CLOCK_RATE = 50  # refresh rate [Hz]
 TELEM_RATE = 1  # refresh rate for telemetry aquistion [Hz]
@@ -55,6 +64,7 @@ vessel.auto_pilot.target_pitch_and_heading(90, mission_params.target_heading)
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                            mission_params.root_vessel)
 
+telem_viz.start_telem_publish(telem)
 time.sleep(3)
 vessel.control.gear = False
 
