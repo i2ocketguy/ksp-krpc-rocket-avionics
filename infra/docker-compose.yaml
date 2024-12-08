@@ -45,6 +45,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin # for simplicity, in real use set a stronger password
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
 #      - ./grafana/data:/var/lib/grafana # so changes to dashboards survive a restart, requires ownership of the dir by user 472
