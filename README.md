@@ -18,14 +18,13 @@ Check out https://kerbalx.com/I2ocketGuy/craft, especially:
 
 WIP docker compose based orchestration available for launch with
 
-`make launch_metrics` will launch the system using host networking and requires the following ports available:
-- 3000
-- 9090
-- 8012
-- 50000
-- 50001
+`make launch_metrics_backend` will launch the metrics system backend systems: grafana for frontend and prometheus for timeseries DB.
+
+`make launch_rocket` will run the default avionics package defined in the Makefile. This can be sent an avionics file paramaeter, for example to launch the `maxerva1.py` fsw, run `make avionics_file=maxerva1.py launch_rocket`
 
 access the system via browser at localhost:3000
+
+a network diagram of expected system interactions follows:
 
 ```mermaid
 

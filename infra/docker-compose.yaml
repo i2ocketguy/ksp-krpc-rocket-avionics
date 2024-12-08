@@ -1,11 +1,13 @@
 version: '3.8'
 
 services:
-  app:
+  fsw:
+    profiles:
+      - fsw
     build:
       context: ../
       dockerfile: infra/Dockerfile
-    container_name: ksp_telemetry_app
+    container_name: fsw
 #    ports:
 #      - "8012:8012"
     network_mode: host
@@ -16,10 +18,13 @@ services:
 #      - host.docker.internal:host-gateway
     environment:
 #      KRPC_ADDRESS: host.docker.internal
-      TELEM_PUBLISH_RATE: 10
+      TELEM_PUBLISH_RATE: 10 # hz
       PYTHONUNBUFFERED: 1
+    command: "uv run minerva1.py"
 
   prometheus:
+    profiles:
+      - metrics_backend
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
@@ -33,6 +38,8 @@ services:
 #      - telemetry_net
 
   grafana:
+    profiles:
+      - metrics_backend
     image: grafana/grafana-oss:latest
     container_name: grafana
 #    ports:
