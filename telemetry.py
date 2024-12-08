@@ -83,8 +83,6 @@ class KSPTelemetry:
 
 
     def publish_enum_metric(self, name:str, state: str, display_name: str = None, console_out: bool = True):
-        if console_out:
-            print(f'{str(datetime.now(UTC).isoformat())} [{name}] {state} {f"\n   {display_name}" if display_name else ""}')
 
         if name not in self.enum_metrics:
             print("WARNING: skipping publish of unknown enum. remember to register it first with register_enum_metric!")

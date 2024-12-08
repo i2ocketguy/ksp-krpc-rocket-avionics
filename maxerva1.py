@@ -6,13 +6,12 @@ import time
 import steering_logic as sas
 import numpy as np
 import final_stage
+
 from launch_utils import ControlMode, enter_control_mode
 from telemetry import KSPTelemetry
 
 telem_viz = KSPTelemetry()
 telem_viz.start_metrics_server()
-
-
 telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
                                [mode.name for mode in utils.ControlMode])
 enter_control_mode(ControlMode.PAD, telem_viz)
@@ -45,7 +44,6 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
                 "LiquidFuel"
         ) <= prop_meco_condition + sc.upper_stage_LF + sc.payload_LF:
             enter_control_mode(ControlMode.MECO_PREP, telem_viz)
-            # print("Stabilizing Pitch for MECO")
             time.sleep(5)
             vessel.control.rcs = True
             vessel.control.sas = True

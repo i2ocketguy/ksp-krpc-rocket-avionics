@@ -7,13 +7,22 @@ import steering_logic as sas
 import numpy as np
 import final_stage
 
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
+
 def pitch_maneuver(prop_sep_condition, mission_params, telem, vessel, conn, sc,
                    maxq_thrust_control, max_accel_thrust_control, apoapsis_limit=None):
     print("Entering Pitch Over Maneuver")
     meco = False
     while not meco:
         if not mission_params.maxq_exit:
-            sas.maxQ(mission_params, telem, vessel, maxq_thrust_control)
+            sas.maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz)
 
         if vessel.flight(
         ).g_force >= mission_params.max_g and not mission_params.maxg_enter:
@@ -119,7 +128,7 @@ vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
 vessel.auto_pilot.auto_tune = True
 
 time.sleep(10)
-sas.roll_program(mission_params, telem, vessel, conn, klipper)
+sas.roll_program(mission_params, telem, vessel, conn, klipper, telem_viz)
 time.sleep(5*50 / CLOCK_RATE)
 vessel.auto_pilot.stopping_time = (0.3, 0.5, 0.3)
 pitch_maneuver(sep_condition_multiplier, mission_params, telem, vessel, conn, klipper,
@@ -136,7 +145,11 @@ vessel.control.rcs = True
 #                         -35,
 #                         35,
 #                         deadband=100)
-klipper = final_stage.close_loop_guidance(klipper, mission_params, telem, 100, mission_params.target_heading, target_apo=120000)
+klipper = final_stage.close_loop_guidance(klipper, mission_params, telem, 100, mission_params.target_heading, target_apo=120000, telem_viz=telem_viz)
 vessel.auto_pilot.disengage()
 vessel.control.sas = True
 vessel.control.rcs = True
+enter_control_mode(ControlMode.COAST, telem_viz)
+while True:
+    enter_control_mode(ControlMode.COAST, telem_viz, False)
+    time.sleep(1 / CLOCK_RATE)

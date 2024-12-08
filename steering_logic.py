@@ -90,19 +90,17 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
 
         time.sleep(1 / sc.CLOCK_RATE)
 
-def maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz: KSPTelemetry):
+def maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz: KSPTelemetry = None):
     if vessel.flight().dynamic_pressure >= 10000 and telem.altitude() < 12000:
         vessel.control.throttle = maxq_thrust_control.update(
             vessel.flight().dynamic_pressure)
         if not mission_params.maxq_enter:
             enter_control_mode(ControlMode.MAX_Q, telem_viz)
-            # print("MaxQ - Entering Throttle Bucket")
             mission_params.maxq_enter = True
     elif telem.altitude() >= 12000:
         vessel.control.throttle = 1
         if not mission_params.maxq_exit:
             enter_control_mode(ControlMode.THROTTLE_BUCKET_EXIT, telem_viz)
-            # print("Exiting MaxQ - Throttle Up 1st Stage")
             mission_params.maxq_exit = True
     else:
         vessel.control.throttle = 1

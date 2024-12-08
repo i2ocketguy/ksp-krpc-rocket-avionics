@@ -10,9 +10,20 @@ from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
 
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
+
 # TODO: 
 #       ADD Line-of-Sight navigation
 #       ADD PID control for roll and yaw
+
+
 
 def euler_step(vessel, h, v, dt):
     h = h + v * dt
@@ -124,6 +135,7 @@ vessel.control.sas = True
 vessel.control.rcs = True
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                            mission_params.root_vessel)
+telem_viz.start_telem_publish(telem)
 time.sleep(100/dcx.CLOCK_RATE)
 vessel.control.toggle_action_group(1)
 vessel.auto_pilot.target_pitch_and_heading(90, mission_params.target_heading)

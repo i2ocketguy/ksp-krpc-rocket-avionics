@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, UTC
 from enum import Enum
 
 import krpc
@@ -13,8 +14,8 @@ class ControlMode(str, Enum):
     PAD = "Pad Flight Computer Boot"
     ROLL = "Roll Program"
     PITCH_OVER = "Pitch Over Maneuver"
-    MAX_Q = "MaxQ Throttle Bucket"
-    THROTTLE_BUCKET_EXIT = "Throttle Bucket Exit"
+    MAX_Q = "MaxQ - Entering Throttle Bucket"
+    THROTTLE_BUCKET_EXIT = "Exiting MaxQ - Throttle Up 1st Stage"
     MECO_PREP = "Stabilizing Pitch for MECO"
     MECO = "MECO"
     S2_INIT = "Stage 2 Init"
@@ -25,8 +26,13 @@ class ControlMode(str, Enum):
     ABORT = "Abort"
 
 
-def enter_control_mode(mode: ControlMode, telem_viz: KSPTelemetry, console_out: bool = True):
-    telem_viz.publish_enum_metric(CONTROL_MODE, mode.name, mode.value, console_out)
+def enter_control_mode(mode: ControlMode, telem_viz: KSPTelemetry = None, console_out: bool = True):
+    if console_out:
+        print(f'{str(datetime.now(UTC).isoformat())} [{CONTROL_MODE}] {mode.name} {f"\n   {mode.value}"}')
+    if telem_viz is not None:
+        telem_viz.publish_enum_metric(CONTROL_MODE, mode.name, mode.value, console_out)
+    else:
+        print("WARNING migrate to add telem_viz service to fn call")
 
 
 def initialize():
@@ -178,13 +184,13 @@ def pad_separation(vessel):
     part.docking_port.undock()
     print("Lift Off!")
 
-def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry):
+def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry = None):
     if is_abort_installed:
         abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz)
     else:
         pass
 
-def abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry):
+def abort_trigger_check(abort_criteria, vessel, mission_params, conn, crew_vehicle, telem_viz: KSPTelemetry = None):
     # TODO: check abort activation
     #  check crtieria surpassed
     #  if crtieria surpassed, abort
