@@ -8,4 +8,4 @@ datasources:
     isDefault: true
     editable: false
     jsonData:
-      timeInterval: "1s"
+      timeInterval: "100ms"

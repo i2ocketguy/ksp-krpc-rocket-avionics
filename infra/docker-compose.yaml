@@ -16,6 +16,7 @@ services:
 #      - host.docker.internal:host-gateway
     environment:
 #      KRPC_ADDRESS: host.docker.internal
+      TELEM_PUBLISH_RATE: 10
       PYTHONUNBUFFERED: 1
 
   prometheus:

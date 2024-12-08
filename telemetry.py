@@ -1,3 +1,4 @@
+import os
 import random
 import time
 import threading
@@ -9,11 +10,12 @@ from mission import Telemetry
 
 class KSPTelemetry:
     """
-    A class to represent and expose Kerbal Space Program telemetry metrics.
+    A class to handle publishing metrics periodically
     """
 
     def __init__(self):
-        # Define your metrics here
+        self.publish_rate_hz = int(os.environ.get('TELEM_PUBLISH_RATE', 0))
+
         self.surface_altitude = Gauge('surface_altitude', 'surface_altitude in meters')
         self.altitude = Gauge('altitude', 'altitude in meters')
         self.apoapsis = Gauge('apoapsis', 'apoapsis in meters')
@@ -23,14 +25,20 @@ class KSPTelemetry:
         self.periapsis = Gauge('periapsis', 'periapsis in meters')
 
 
+
     def start_metrics_server(self, port: int = 8012):
         # todo some kind of lock or better error handling here if this class is instantiated > once
         start_http_server(port)
 
 
-    def start_telem_publish(self, telemetry: Telemetry):
+    def start_telem_publish(self, telemetry: Telemetry) -> bool:
+        if self.publish_rate_hz == 0:
+            print('not starting telemetry publish thread')
+            return False
+
         updater_thread = threading.Thread(target=self._telem_publish_thread, args=(telemetry,), daemon=True)
         updater_thread.start()
+        return True
 
 
     def _telem_publish_thread(self, telemetry: Telemetry):
@@ -43,4 +51,4 @@ class KSPTelemetry:
             self.horizontal_vel.set(telemetry.horizontal_vel())
             self.periapsis.set(telemetry.periapsis())
 
-            time.sleep(0.5)
+            time.sleep(1/self.publish_rate_hz)
