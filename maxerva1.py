@@ -7,15 +7,24 @@ import steering_logic as sas
 import numpy as np
 import final_stage
 
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
+
 def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
                    maxq_thrust_control, max_accel_thrust_control, apoapsis_limit=None):
-    print("Entering Pitch Over Maneuver")
+    enter_control_mode(ControlMode.PITCH_OVER, telem_viz)
     meco = False
     while not meco:
         utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
-                           mission_params, conn, "CEV")
+                           mission_params, conn, "CEV", telem_viz)
         if not mission_params.maxq_exit:
-            sas.maxQ(mission_params, telem, vessel, maxq_thrust_control)
+            sas.maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz)
 
         if vessel.flight(
         ).g_force >= mission_params.max_g and not mission_params.maxg_enter:
@@ -34,7 +43,7 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
         if vessel.resources.amount(
                 "LiquidFuel"
         ) <= prop_meco_condition + sc.upper_stage_LF + sc.payload_LF:
-            print("Stabilizing Pitch for MECO")
+            enter_control_mode(ControlMode.MECO_PREP, telem_viz)
             time.sleep(5)
             vessel.control.rcs = True
             vessel.control.sas = True
@@ -121,18 +130,17 @@ vessel.control.activate_next_stage()  # pad sep
 time.sleep(3)
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                                mission_params.root_vessel)
-
+telem_viz.start_telem_publish(telem)
 vessel.auto_pilot.engage()
 # vessel.auto_pilot.stopping_time = (0.1, 0.2, .6)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
                                                vessel.flight().heading)
 # vessel.auto_pilot.auto_tune = True
 vessel.auto_pilot.roll_pid_gains = (10.1, 0.0, 0.0)
-
-sas.roll_program(mission_params, telem, vessel, conn, maxerva)
+sas.roll_program(mission_params, telem, vessel, conn, maxerva, telem_viz)
 pitch_maneuver(meco_condition_multiplier, mission_params, telem, vessel, conn, maxerva,
                    maxq_thrust_control, max_accel_thrust_control)
-sas.meco(vessel, maxerva)
+sas.meco(vessel, maxerva, telem_viz)
 vessel.control.activate_next_stage()  # 2nd stage separation
 second, telem = utils.check_active_vehicle(conn, vessel,
                                                     mission_params.root_vessel)
@@ -150,7 +158,12 @@ print("Enter closed loop guidance, second stage.")
 # else:
 #     mission_params.target_roll = 0
 second.control.rcs = True
-second = final_stage.close_loop_guidance(second, mission_params, telem, 100, mission_params.target_heading, pid_input=final_pitch_control)
+
+second = final_stage.close_loop_guidance(second, mission_params, telem, 100, mission_params.target_heading, pid_input=final_pitch_control, telem_viz=telem_viz)
 second.auto_pilot.disengage()
 second.control.sas = True
 second.control.rcs = True
+enter_control_mode(ControlMode.COAST, telem_viz)
+while True:
+    enter_control_mode(ControlMode.COAST, telem_viz, False)
+    time.sleep(1 / CLOCK_RATE)

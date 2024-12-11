@@ -7,6 +7,15 @@ import steering_logic as sas
 import numpy as np
 import final_stage
 
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
+
 def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
                    maxq_thrust_control, max_accel_thrust_control, apoapsis_limit=None):
     print("Entering Pitch Over Maneuver")
@@ -105,17 +114,18 @@ time.sleep(3)
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                                mission_params.root_vessel)
 
+telem_viz.start_telem_publish(telem)
 vessel.auto_pilot.engage()
 vessel.auto_pilot.stopping_time = (1.5, 1.3, 1.5)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
                                                vessel.flight().heading)
 vessel.auto_pilot.auto_tune = True
 
-sas.roll_program(mission_params, telem, vessel, conn, f9)
+sas.roll_program(mission_params, telem, vessel, conn, f9, telem_viz)
 time.sleep(5*50 / CLOCK_RATE)
 pitch_maneuver(meco_condition_multiplier, mission_params, telem, vessel, conn, f9,
                    maxq_thrust_control, max_accel_thrust_control)
-sas.meco(vessel, f9)
+sas.meco(vessel, f9, telem_viz)
 vessel.control.set_action_group(1, True)
 # vessel.control.activate_next_stage()  # 2nd stage separation
 second, telem = utils.check_active_vehicle(conn, vessel,
@@ -129,7 +139,11 @@ second.control.activate_next_stage()  # Fairing deployment
 print("Enter closed loop guidance, second stage.")
 mission_params.target_roll = 0
 second.control.rcs = True
-second = final_stage.close_loop_guidance(second, mission_params, telem, 110, mission_params.target_heading)
+second = final_stage.close_loop_guidance(second, mission_params, telem, 110, mission_params.target_heading, telem_viz)
 second.auto_pilot.disengage()
 second.control.sas = True
 second.control.rcs = True
+enter_control_mode(ControlMode.COAST, telem_viz)
+while True:
+    enter_control_mode(ControlMode.COAST, telem_viz, False)
+    time.sleep(1 / CLOCK_RATE)

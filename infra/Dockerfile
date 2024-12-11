@@ -1,0 +1,13 @@
+FROM python:3.12-alpine
+
+RUN pip install uv==0.5.7
+
+COPY .python-version pyproject.toml uv.lock avionics/
+
+WORKDIR avionics
+
+RUN uv sync
+
+COPY . .
+
+CMD uv run maxerva1.py

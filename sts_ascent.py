@@ -6,6 +6,14 @@ import time
 import steering_logic as sas
 import numpy as np
 import final_stage
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
+telem_viz = KSPTelemetry()
+telem_viz.start_metrics_server()
+telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
+                               [mode.name for mode in utils.ControlMode])
+enter_control_mode(ControlMode.PAD, telem_viz)
 
 def pitch_maneuver(mission_params, telem, vessel, sc):
     print("Entering Pitch Over Maneuver")
@@ -84,7 +92,7 @@ vessel.control.activate_next_stage()  # SRB Ignition + Pad separation
 time.sleep(3)
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                                mission_params.root_vessel)
-
+telem_viz.start_telem_publish(telem)
 vessel.auto_pilot.engage()
 vessel.auto_pilot.stopping_time = (0.5, 0.3, 0.5)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
@@ -101,7 +109,12 @@ print("Enter closed loop guidance, second stage.")
 time.sleep(5*50 / CLOCK_RATE)
 mission_params.target_roll = 0
 vessel.control.rcs = True
-sts = final_stage.close_loop_guidance(sts, mission_params, telem, 110, mission_params.target_heading, target_periapsis=23000)
+sts = final_stage.close_loop_guidance(sts, mission_params, telem, 110, mission_params.target_heading, target_periapsis=23000, telem_viz=telem_viz)
 vessel.auto_pilot.disengage()
 vessel.control.sas = True
 vessel.control.rcs = True
+
+enter_control_mode(ControlMode.COAST, telem_viz)
+while True:
+    enter_control_mode(ControlMode.COAST, telem_viz, False)
+    time.sleep(1 / CLOCK_RATE)
