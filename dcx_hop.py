@@ -9,14 +9,24 @@ import steering_logic as steering
 import math
 from digitalfilter import low_pass_filter as LPF
 
-from launch_utils import ControlMode, enter_control_mode
+from launch_utils import DcxControlMode, enter_control_mode
 from telemetry import KSPTelemetry
 
 telem_viz = KSPTelemetry()
 telem_viz.start_metrics_server()
 telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
-                               [mode.name for mode in utils.ControlMode])
-enter_control_mode(ControlMode.PAD, telem_viz)
+                               [mode.name for mode in DcxControlMode])
+telem_viz.register_gauge_metric('distance_to_pad', 'distance_to_pad')
+telem_viz.register_gauge_metric('current_horizontal_velocity', 'current_horizontal_velocity')
+telem_viz.register_gauge_metric('distance_pitch', 'distance_pitch')
+telem_viz.register_gauge_metric('velocity_pitch', 'velocity_pitch')
+telem_viz.register_gauge_metric('pitch_input', 'pitch_input')
+telem_viz.register_gauge_metric('heading_error', 'heading_error')
+telem_viz.register_gauge_metric('roll', 'roll')
+telem_viz.register_gauge_metric('roll_input', 'roll_input')
+telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
+telem_viz.register_gauge_metric('throttle', 'throttle')
+enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # constants
 CLOCK_RATE = 50  # refresh rate [Hz]
@@ -50,11 +60,13 @@ mission_params.target_heading = utils.set_azimuth(vessel,
 
 # Pre-Launch
 utils.launch_countdown(1)
+enter_control_mode(DcxControlMode.IGNITION, telem_viz)
 vessel.control.activate_next_stage()  # Engine Ignition
 vessel.auto_pilot.engage()
 vessel.auto_pilot.auto_tune = True
 throttle_limit = utils.throttle_from_twr(vessel, 3.0)
 vessel.control.throttle = throttle_limit
+telem_viz.publish_gauge_metric('throttle', throttle_limit, False)
 vessel.control.sas = True
 vessel.control.rcs = True
 time.sleep(1/dcx.CLOCK_RATE)
@@ -73,6 +85,7 @@ target_alt = 2000 + telem.apoapsis()
 hmax = 0
 drag = 0
 g = 0
+enter_control_mode(DcxControlMode.BURN_TO_ALTITUDE, telem_viz)
 while telem.apoapsis()-(telem.vertical_vel()*(drag/vessel.mass)) < target_alt: #telem.altitude()+hmax < target_alt:
     drag = vessel.flight().drag
     drag = math.sqrt(math.pow(drag[0],2) + math.pow(drag[1],2) + math.pow(drag[2],2))
@@ -81,6 +94,8 @@ while telem.apoapsis()-(telem.vertical_vel()*(drag/vessel.mass)) < target_alt: #
     time.sleep(10/dcx.CLOCK_RATE)
 
 vessel.control.throttle = 0.0
+telem_viz.publish_gauge_metric('throttle', 0.0, False)
+enter_control_mode(DcxControlMode.COAST_TO_ALTITUDE, telem_viz)
 while telem.surface_altitude() < target_alt and telem.vertical_vel() > 10:
     pass
 
@@ -105,6 +120,7 @@ while telem.surface_altitude() < target_alt:
 print("Passed %i, entering vertical velocity hold ..." % target_alt)
 new_throttle_limit = utils.throttle_from_twr(vessel, 0.0)
 vessel.control.throttle = new_throttle_limit
+telem_viz.publish_gauge_metric('throttle',new_throttle_limit, False)
 #vert_vel_controller = pid.PID(0.5, 0.0, 0.05, -0.5, 0.5, deadband=0.01) # 0.8, .1, .001
 Tu = 300
 Ku = 2.5
@@ -121,6 +137,7 @@ throttle_lpf = LPF(4,3,dcx.CLOCK_RATE)
 for thruster in vessel.parts.rcs:
     thruster.enabled = True
 
+enter_control_mode(DcxControlMode.MODE_1, telem_viz)
 mode = 1
 status = vessel.situation
 starting_time = time.time()
@@ -136,15 +153,19 @@ while vessel.situation == status:
 
     # Mode 1 is hover at target altitude
     if mode == 1:
+        enter_control_mode(DcxControlMode.MODE_1, telem_viz, False)
         #vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
+        telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
         if int(elapsed_time) > 10:
+            enter_control_mode(DcxControlMode.MODE_2, telem_viz)
             mode = 2
             vessel.auto_pilot.stopping_time = (0.1,0.1,0.1)
             vessel.auto_pilot.deceleration_time = (18.0,18.0,18.0)
             vessel.control.throttle = 0.0
+            telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
             vessel.auto_pilot.target_pitch = 0
             vessel.auto_pilot.target_roll = 0
             print("Exiting altitude hold ...")
@@ -171,6 +192,7 @@ while vessel.situation == status:
             pass
         if T >= vessel.available_thrust and burn_flag is False:
             vessel.control.throttle = 1.0
+            telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
             burn_flag = True
             for thruster in vessel.parts.rcs:
                 thruster.enabled = False
@@ -199,6 +221,7 @@ while vessel.situation == status:
             vert_vel_controller.update_gains(Kp, Ki, Kd)
             vert_vel_controller.set_point = -5
             mode = 3
+            enter_control_mode(DcxControlMode.MODE_3, telem_viz)
             for thruster in vessel.parts.rcs:
                 thruster.enabled = True
             vessel.auto_pilot.reference_frame = vessel.surface_reference_frame
@@ -228,13 +251,16 @@ while vessel.situation == status:
         throttle_update = time.time()
 
     # Plot states
+    telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
     throttle_datastream.update_data_stream(elapsed_time, vessel.control.throttle)
     altitude_datastream.update_data_stream(elapsed_time, telem.altitude())
     vertvel_datastream.update_data_stream(elapsed_time, telem.vertical_vel())
 
     time.sleep(1/dcx.CLOCK_RATE)
 
+enter_control_mode(DcxControlMode.LANDED, telem_viz)
 vessel.control.throttle = 0.0
+telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
 vessel.auto_pilot.disengage()
 vessel.control.rsc = False
 vessel.control.sas = True
@@ -242,3 +268,5 @@ throttle_datastream.plot()
 altitude_datastream.plot()
 vertvel_datastream.plot()
 plt.show()
+enter_control_mode(DcxControlMode.SHUTDOWN, telem_viz)
+time.sleep(1)

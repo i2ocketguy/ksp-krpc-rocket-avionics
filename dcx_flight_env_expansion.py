@@ -26,6 +26,7 @@ telem_viz.register_gauge_metric('heading_error', 'heading_error')
 telem_viz.register_gauge_metric('roll', 'roll')
 telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
+telem_viz.register_gauge_metric('throttle', 'throttle')
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # TODO: 
@@ -141,6 +142,7 @@ vessel.auto_pilot.engage()
 vessel.auto_pilot.auto_tune = True
 throttle_limit = utils.throttle_from_twr(vessel, 1.5)
 vessel.control.throttle = throttle_limit
+telem_viz.publish_gauge_metric('throttle', throttle_limit, False)
 vessel.control.sas = True
 vessel.control.rcs = True
 vessel, telem = utils.check_active_vehicle(conn, vessel,
@@ -168,6 +170,7 @@ while True:
 
     if h_future > target_alt:
         vessel.control.throttle = 0.0
+        telem_viz.publish_gauge_metric('throttle', 0.0, False)
         enter_control_mode(DcxControlMode.COAST_TO_ALTITUDE, telem_viz)
         break
 
@@ -179,6 +182,7 @@ enter_control_mode(DcxControlMode.VERTICAL_HOLD, telem_viz)
 print("Passed %i, entering vertical velocity hold ..." % target_alt)
 new_throttle_limit = utils.throttle_from_twr(vessel, 0.0)
 vessel.control.throttle = new_throttle_limit
+telem_viz.publish_gauge_metric('throttle', new_throttle_limit, False)
 Tu = 300
 Ku = 2.5
 Kp = 0.2*Ku
@@ -230,8 +234,10 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
+        telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
         if int(elapsed_time) > 10:
             vessel.control.throttle = 0.0
+            telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
             enter_control_mode(DcxControlMode.MODE_2, telem_viz)
             mode = 2
             vessel.auto_pilot.stopping_time = (0.3, 0.3, 0.3)
@@ -283,11 +289,13 @@ while vessel.situation != status:
             prev_dist = distance_to_pad
             if tb > -0.75 and telem.surface_altitude() < 5000 and burn_flag is False:
                 vessel.control.throttle = slam_controller.update(tb)
+                telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
                 burn_flag = True
                 vessel.auto_pilot.stopping_time = (1.2, 0.2, 0.2)
 
             if telem.surface_altitude() >= 50 and burn_flag is True:
                 vessel.control.throttle = slam_controller.update(tb)
+                telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
 
             if telem_viz.gnc_debug:
                 print(f"Mode 2a Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
@@ -302,6 +310,7 @@ while vessel.situation != status:
             # Compute line of sight angle to landing pad
             throttle_limit = utils.throttle_from_twr(vessel, 1.0)
             vessel.control.throttle = throttle_limit
+            telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
             current_position = (vessel.flight().latitude, vessel.flight().longitude)
             heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
@@ -362,6 +371,7 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
+        telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
 
         # Get the vessel's velocity relative to the surface
         v_vec = vessel.flight(ref_frame).velocity
@@ -415,6 +425,7 @@ while vessel.situation != status:
         throttle_update = time.time()
 
     # Plot states
+    telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
     throttle_datastream.update_data_stream(elapsed_time, vessel.control.throttle)
     altitude_datastream.update_data_stream(elapsed_time, telem.altitude())
     vertvel_datastream.update_data_stream(elapsed_time, telem.vertical_vel())
