@@ -28,6 +28,7 @@ telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
 telem_viz.register_gauge_metric('throttle', 'throttle')
 telem_viz.register_counter_metric('gnc_frame_count', 'gnc_frame_count')
+telem_viz.register_counter_metric('gnc_overrun_count', 'gnc_overrun_count')
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # TODO: 
@@ -227,8 +228,19 @@ distance_to_pad = 10000
 pitch_lpf = LPF(4,1,10.0)
 prev_dist = 0
 vel_sign = -1
+expected_frame_time = (1/dcx.CLOCK_RATE) * 1e9
+def dynamic_sleep(actual_frame_time: float):
+    if actual_frame_time > expected_frame_time:
+        if telem_viz.gnc_debug:
+            print(f"Overrun! Time={actual_frame_time:.2f} seconds")
+        telem_viz.increment_counter_metric('gnc_overrun_count')
+    else:
+        to_sleep = expected_frame_time - actual_frame_time
+        time.sleep(to_sleep / 1e9)
+
 while vessel.situation != status:
     telem_viz.increment_counter_metric('gnc_frame_count')
+    frame_start_time = time.time_ns()
     elapsed_time = time.time() - starting_time
 
     # Mode 1 is hover at target altitude
@@ -416,6 +428,12 @@ while vessel.situation != status:
 
     if int(time.time()) - int(throttle_update) > 5:
         if telem.surface_altitude()-target_alt < 50 and telem.vertical_vel() < -10:
+            frame_end_time = time.time_ns()
+            frame_time = frame_end_time - frame_start_time
+            if frame_time > expected_frame_time:
+                if telem_viz.gnc_debug:
+                    print(f"Overrun! Time={frame_time} nanos")
+                telem_viz.increment_counter_metric('gnc_overrun_count')
             continue
             new_throttle_limit = utils.throttle_from_twr(vessel, 0.25)
         elif mode == 5:
@@ -436,7 +454,9 @@ while vessel.situation != status:
     horizontal_dist.update_data_stream(elapsed_time, distance_to_pad)
     horizontal_vel.update_data_stream(elapsed_time, current_horizontal_velocity)
     pitch_log.update_data_stream(elapsed_time, pitch_input)
-    time.sleep(1/dcx.CLOCK_RATE)
+    frame_end_time = time.time_ns()
+    frame_time = frame_end_time - frame_start_time
+    dynamic_sleep(frame_time)
 
 enter_control_mode(DcxControlMode.LANDED, telem_viz)
 vessel.control.throttle = 0.0

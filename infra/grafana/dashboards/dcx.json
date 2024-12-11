@@ -256,7 +256,7 @@
           "expr": "distance_to_pad",
           "format": "time_series",
           "interval": "1s",
-          "instant": true,
+          "instant": false,
           "intervalFactor": 1,
           "legendFormat": "distance_to_pad",
           "refId": "A",
@@ -266,7 +266,7 @@
           "expr": "current_horizontal_velocity",
           "format": "time_series",
           "interval": "1s",
-          "instant": true,
+          "instant": false,
           "intervalFactor": 1,
           "legendFormat": "current_horizontal_velocity",
           "refId": "B",
@@ -282,7 +282,7 @@
         "sort": 0,
         "value_type": "individual"
       },
-      "type": "graph",
+      "type": "stat",
       "xaxis": {
         "buckets": null,
         "mode": "time",
@@ -751,6 +751,16 @@
           "intervalFactor": 1,
           "legendFormat": "frames per second",
           "refId": "I",
+          "range": true
+        },
+        {
+          "expr": "rate(gnc_overrun_count_total[1s])",
+          "format": "gnc_overrun_count_total",
+          "interval": "100ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "overruns per second",
+          "refId": "O",
           "range": true
         }
       ],
