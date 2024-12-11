@@ -16,7 +16,7 @@ Check out https://kerbalx.com/I2ocketGuy/craft, especially:
 
 ## Live telem view
 
-WIP docker compose based orchestration available for launch with
+docker compose based orchestration available for launch with live telemetry graphs available.
 
 `make launch_metrics_backend` will launch the metrics system backend systems: grafana for frontend and prometheus for timeseries DB.
 
@@ -28,11 +28,33 @@ a network diagram of expected system interactions follows:
 
 ```mermaid
 
-flowchart TD
+flowchart TB
+  
+  human((human))
+  prometheus[(prometheus)]
+  
+  subgraph Docker 
+      
+      grafana
+      prometheus
+      avionics
+  end
+  
+  subgraph KSP Game
+      direction LR
+      KSP
+      kRPC
+  end
     
-  human -- localhost:3000  --> grafana -- localhost:9090 --> prometheus -- localhost:8012/healthz --> avionics
+  human --> web_browser -- localhost:3000  --> grafana -- localhost:9090 --> prometheus -- localhost:8012/healthz --> avionics
+  avionics -- localhost:50000 --> kRPC <-- in-memory commands and telem--> KSP 
   
   grafana -- telem graphs --> human
   avionics -- telem --> prometheus
   prometheus -- telem --> grafana
+  
+  KSP -- 3D vehicle simulation --> human
+  
+  avionics <-- commands and telem --> kRPC
+  
 ```
