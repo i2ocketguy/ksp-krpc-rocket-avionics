@@ -1,6 +1,11 @@
+container_backend=podman
+# options for container_backend =
+#   docker
+#   podman
+
 launch_metrics_backend:
 	cd infra && \
-	docker compose --profile metrics_backend up -d
+	$(container_backend) compose --profile metrics_backend up -d
 
 
 avionics_file=minerva1.py
@@ -19,10 +24,10 @@ avionics_file=minerva1.py
 
 launch_rocket:
 	cd infra && \
-	docker compose --profile fsw run --build --service-ports fsw uv run $(avionics_file)
+	$(container_backend) compose --profile fsw run --build --service-ports fsw uv run $(avionics_file)
 
 
 stop_all:
 	cd infra && \
-	docker compose --profile fsw down && \
-	docker compose --profile metrics_backend down
+	$(container_backend) compose --profile fsw down && \
+	$(container_backend) compose --profile metrics_backend down

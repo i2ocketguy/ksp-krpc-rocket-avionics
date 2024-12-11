@@ -16,15 +16,21 @@ Check out https://kerbalx.com/I2ocketGuy/craft, especially:
 
 ## Live telem view
 
-docker compose based orchestration available for launch with live telemetry graphs available.
+Docker compose based orchestration available for launch with live telemetry graphs available.
+Podman is also supported, through the `podman-compose` package and changing the `container_backend` variable in the `Makefile`.
 
 `make launch_metrics_backend` will launch the metrics system backend systems: grafana for frontend and prometheus for timeseries DB.
 
+Access the monitoring system via browser at http://localhost:3000 and username/password `admin` 
+
+Dashboard config files are setup as volume mounts at [infra/grafana/dashboards/*.json](infra/grafana/dashboards).
+You can edit the file, wait about 5 seconds, refresh the dashboard, and see changes made in the JSON reflected.
+
 `make launch_rocket` will run the default avionics package defined in the Makefile. This can be sent an avionics file paramaeter, for example to launch the `maxerva1.py` fsw, run `make avionics_file=maxerva1.py launch_rocket`
 
-access the system via browser at localhost:3000
+## Architecture
 
-a network diagram of expected system interactions follows:
+A network diagram of expected system interactions follows:
 
 ```mermaid
 
@@ -33,7 +39,7 @@ flowchart TB
   human((human))
   prometheus[(prometheus)]
   
-  subgraph Docker 
+  subgraph Containers 
       
       grafana
       prometheus

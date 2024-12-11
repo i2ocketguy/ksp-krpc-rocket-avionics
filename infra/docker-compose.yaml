@@ -1,5 +1,5 @@
 version: '3.8'
-
+name: ksp-avionics
 services:
   fsw:
     profiles:
@@ -28,7 +28,7 @@ services:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:Z
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
 #    ports:
@@ -52,10 +52,10 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin # for simplicity, in real use set a stronger password
     volumes:
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:Z
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:Z
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:Z
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:Z
 #      - ./grafana/data:/var/lib/grafana # so changes to dashboards survive a restart, requires ownership of the dir by user 472
 
 #networks:
