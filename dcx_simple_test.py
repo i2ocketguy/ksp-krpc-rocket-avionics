@@ -27,6 +27,7 @@ telem_viz.register_gauge_metric('roll', 'roll')
 telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
 telem_viz.register_gauge_metric('throttle', 'throttle')
+telem_viz.register_counter_metric('gnc_frame_count', 'gnc_frame_count')
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 def euler_step(vessel, h, v, dt):
@@ -185,6 +186,7 @@ while True:
     for _ in range(int(vessel.orbit.time_to_apoapsis/dt)):
         h_old = h_future
         h_future, v_future = euler_step(vessel, h_future, v_future, dt)
+        telem_viz.increment_counter_metric('gnc_frame_count')
         if h_future < h_old:
             break
 
@@ -203,6 +205,7 @@ while True:
     # print(h_future)
 
 while telem.vertical_vel() > 2:
+    telem_viz.increment_counter_metric('gnc_frame_count')
     time.sleep(10/dcx.CLOCK_RATE)
     pass
 
@@ -244,6 +247,7 @@ pitch_lpf = LPF(4,1,10.0)
 prev_dist = 0
 vel_sign = -1
 while vessel.situation != status:
+    telem_viz.increment_counter_metric('gnc_frame_count')
     elapsed_time = time.time() - starting_time
 
     # Mode 1 is hover at target altitude

@@ -26,6 +26,7 @@ telem_viz.register_gauge_metric('roll', 'roll')
 telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
 telem_viz.register_gauge_metric('throttle', 'throttle')
+telem_viz.register_counter_metric('gnc_frame_count', 'gnc_frame_count')
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # constants
@@ -91,12 +92,14 @@ while telem.apoapsis()-(telem.vertical_vel()*(drag/vessel.mass)) < target_alt: #
     drag = math.sqrt(math.pow(drag[0],2) + math.pow(drag[1],2) + math.pow(drag[2],2))
     g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
     #hmax = math.pow(telem.velocity(),2)*math.pow(math.sin(vessel.flight().pitch),2)/(2*(g-(0.9*drag/vessel.mass)))
+    telem_viz.increment_counter_metric('gnc_frame_count')
     time.sleep(10/dcx.CLOCK_RATE)
 
 vessel.control.throttle = 0.0
 telem_viz.publish_gauge_metric('throttle', 0.0, False)
 enter_control_mode(DcxControlMode.COAST_TO_ALTITUDE, telem_viz)
 while telem.surface_altitude() < target_alt and telem.vertical_vel() > 10:
+    telem_viz.increment_counter_metric('gnc_frame_count')
     pass
 
 '''
@@ -148,6 +151,7 @@ throttle_datastream = pu.data_stream_plot()
 altitude_datastream = pu.data_stream_plot()
 vertvel_datastream = pu.data_stream_plot()
 while vessel.situation == status:
+    telem_viz.increment_counter_metric('gnc_frame_count')
     count = count + 1
     elapsed_time = time.time() - starting_time
 

@@ -4,7 +4,7 @@ import time
 from datetime import datetime, UTC
 import threading
 
-from prometheus_client import start_http_server, Gauge, Enum
+from prometheus_client import start_http_server, Gauge, Enum, Counter
 
 from mission import Telemetry
 
@@ -28,6 +28,7 @@ class KSPTelemetry:
 
         # metrics which come from control system calculations, not krpc streams
         self.gauge_metrics = {}
+        self.counter_metrics = {}
         self.enum_metrics = {}
 
         self.gnc_debug = os.environ.get('GNC_DEBUG', None) is not None
@@ -78,6 +79,20 @@ class KSPTelemetry:
             self.gauge_metrics[name].set(state)
         except Exception as e:
             print(f"ERROR: could not publish gauge metric for reason: {str(e)}")
+
+
+    def register_counter_metric(self, name: str, description: str):
+        self.counter_metrics[name] = Counter(name, description)
+
+
+    def increment_counter_metric(self, name: str):
+        if name not in self.counter_metrics:
+            print(f"WARNING: skipping publish of unknown counter metric '{name}'. remember to register it first with register_counter_metric!")
+            return
+        try:
+            self.counter_metrics[name].inc()
+        except Exception as e:
+            print(f"ERROR: could not publish counter metric for reason: {str(e)}")
 
 
     def register_enum_metric(self, name: str, description: str, states: [str]):
