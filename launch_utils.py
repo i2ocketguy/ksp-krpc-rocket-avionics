@@ -12,6 +12,7 @@ from telemetry import KSPTelemetry
 CONTROL_MODE = "control_mode"
 class ControlMode(str, Enum):
     PAD = "Pad Flight Computer Boot"
+    IGNITION = "Ignition"
     ROLL = "Roll Program"
     PITCH_OVER = "Pitch Over Maneuver"
     MAX_Q = "MaxQ - Entering Throttle Bucket"
@@ -25,8 +26,22 @@ class ControlMode(str, Enum):
     COAST = "Coast"
     ABORT = "Abort"
 
+class DcxControlMode(str, Enum):
+    PAD = "Pad Flight Computer Boot"
+    IGNITION = "Ignition"
+    BURN_TO_ALTITUDE = "Powered flight to altitude"
+    COAST_TO_ALTITUDE = "Engine off - coasting to altitude"
+    VERTICAL_HOLD = "Passed target altitude, entering vertical velocity hold"
+    MODE_1 = "Mode 1 - Altitude Hold"
+    MODE_2 = "Mode 2 - Landing target tracking"
+    MODE_2a = "Mode 2a - Landing target tracking (close)"
+    MODE_2b = "Mode 2b - Landing target tracking (far)"
+    MODE_3 = "Mode 3 - Hoverslam"
+    LANDED = "LANDED"
+    SHUTDOWN = "SHUTDOWN"
 
-def enter_control_mode(mode: ControlMode, telem_viz: KSPTelemetry = None, console_out: bool = True):
+
+def enter_control_mode(mode: ControlMode|DcxControlMode, telem_viz: KSPTelemetry = None, console_out: bool = True):
     if console_out:
         print(f'{str(datetime.now(UTC).isoformat())} [{CONTROL_MODE}] {mode.name} {f"\n   {mode.value}"}')
     if telem_viz is not None:

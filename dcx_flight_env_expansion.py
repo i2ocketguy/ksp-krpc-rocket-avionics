@@ -10,14 +10,23 @@ from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
 
-from launch_utils import ControlMode, enter_control_mode
+from launch_utils import DcxControlMode, enter_control_mode
 from telemetry import KSPTelemetry
 
 telem_viz = KSPTelemetry()
 telem_viz.start_metrics_server()
 telem_viz.register_enum_metric(utils.CONTROL_MODE, "The enumerated control mode of the flight computer",
-                               [mode.name for mode in utils.ControlMode])
-enter_control_mode(ControlMode.PAD, telem_viz)
+                               [mode.name for mode in DcxControlMode])
+telem_viz.register_gauge_metric('distance_to_pad', 'distance_to_pad')
+telem_viz.register_gauge_metric('current_horizontal_velocity', 'current_horizontal_velocity')
+telem_viz.register_gauge_metric('distance_pitch', 'distance_pitch')
+telem_viz.register_gauge_metric('velocity_pitch', 'velocity_pitch')
+telem_viz.register_gauge_metric('pitch_input', 'pitch_input')
+telem_viz.register_gauge_metric('heading_error', 'heading_error')
+telem_viz.register_gauge_metric('roll', 'roll')
+telem_viz.register_gauge_metric('roll_input', 'roll_input')
+telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
+enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # TODO: 
 #       ADD Line-of-Sight navigation
@@ -121,6 +130,7 @@ ref_frame = conn.space_center.ReferenceFrame.create_hybrid(
 
 # Pre-Launch
 utils.launch_countdown(1)
+enter_control_mode(DcxControlMode.IGNITION, telem_viz)
 vessel.control.activate_next_stage()  # Engine Ignition
 
 if vessel.available_thrust < 10:
@@ -145,6 +155,7 @@ vessel.control.gear = False
 # Wait until target alititude is achieved
 target_alt = 5000
 dt = 0.5
+enter_control_mode(DcxControlMode.BURN_TO_ALTITUDE, telem_viz)
 while True:
     #predict future apoapsis
     h_future = vessel.flight().mean_altitude
@@ -157,12 +168,14 @@ while True:
 
     if h_future > target_alt:
         vessel.control.throttle = 0.0
+        enter_control_mode(DcxControlMode.COAST_TO_ALTITUDE, telem_viz)
         break
 
 while telem.vertical_vel() > 2:
     time.sleep(10/dcx.CLOCK_RATE)
     pass
 
+enter_control_mode(DcxControlMode.VERTICAL_HOLD, telem_viz)
 print("Passed %i, entering vertical velocity hold ..." % target_alt)
 new_throttle_limit = utils.throttle_from_twr(vessel, 0.0)
 vessel.control.throttle = new_throttle_limit
@@ -188,6 +201,7 @@ hvel_controller.set_point = 60.0
 for thruster in vessel.parts.rcs:
     thruster.enabled = True
 
+enter_control_mode(DcxControlMode.MODE_1, telem_viz)
 mode = 1
 status = vessel.situation.landed
 starting_time = time.time()
@@ -211,12 +225,14 @@ while vessel.situation != status:
 
     # Mode 1 is hover at target altitude
     if mode == 1:
+        enter_control_mode(DcxControlMode.MODE_1, telem_viz, False)
         #vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
         if int(elapsed_time) > 10:
             vessel.control.throttle = 0.0
+            enter_control_mode(DcxControlMode.MODE_2, telem_viz)
             mode = 2
             vessel.auto_pilot.stopping_time = (0.3, 0.3, 0.3)
             # vessel.control.toggle_action_group(1)
@@ -231,6 +247,7 @@ while vessel.situation != status:
     if mode == 2:
         tb = steering.calculate_landing_burn_time(vessel)
         if distance_to_pad < 300:
+            enter_control_mode(DcxControlMode.MODE_2a, telem_viz, False)
             if vessel.thrust > 0:
                 burn_start_flag = True
 
@@ -271,11 +288,17 @@ while vessel.situation != status:
 
             if telem.surface_altitude() >= 50 and burn_flag is True:
                 vessel.control.throttle = slam_controller.update(tb)
-            
-            print(f"Mode 2a Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
+
+            if telem_viz.gnc_debug:
+                print(f"Mode 2a Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
+            telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
+            telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
+            telem_viz.publish_gauge_metric('distance_pitch', distance_pitch, False)
+            telem_viz.publish_gauge_metric('velocity_pitch', velocity_pitch, False)
+            telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
 
         else:
-            
+            enter_control_mode(DcxControlMode.MODE_2b, telem_viz, False)
             # Compute line of sight angle to landing pad
             throttle_limit = utils.throttle_from_twr(vessel, 1.0)
             vessel.control.throttle = throttle_limit
@@ -308,9 +331,17 @@ while vessel.situation != status:
             else:
                 vessel.auto_pilot.target_roll = roll_input
 
-            print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel.flight().roll:.2f} {roll_input:.2f}")
+            if telem_viz.gnc_debug:
+                print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel.flight().roll:.2f} {roll_input:.2f}")
+            telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
+            telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
+            telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
+            telem_viz.publish_gauge_metric('heading_error', heading_error, False)
+            telem_viz.publish_gauge_metric('roll', vessel.flight().roll, False)
+            telem_viz.publish_gauge_metric('roll_input', roll_input, False)
 
         if telem.surface_altitude() < 120 or telem.vertical_vel() > -5:
+            enter_control_mode(DcxControlMode.MODE_3, telem_viz)
             mode = 3
             Tu = 225
             Ku = 2.5
@@ -360,7 +391,11 @@ while vessel.situation != status:
             vessel.auto_pilot.target_heading = heading
             vessel.auto_pilot.target_roll = float('NaN')
 
-        print(f"Mode 3 Outputs: {distance_to_pad:.2f}, {telem.horizontal_vel():2f}, {pitch:.2f}")
+        if telem_viz.gnc_debug:
+            print(f"Mode 3 Outputs: {distance_to_pad:.2f}, {telem.horizontal_vel():2f}, {pitch:.2f}")
+        telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
+        telem_viz.publish_gauge_metric('current_horizontal_velocity', telem.horizontal_vel(), False)
+        telem_viz.publish_gauge_metric('pitch', pitch, False)
 
     if telem.surface_altitude() < 30:
         vessel.control.gear = True
@@ -388,6 +423,7 @@ while vessel.situation != status:
     pitch_log.update_data_stream(elapsed_time, pitch_input)
     time.sleep(1/dcx.CLOCK_RATE)
 
+enter_control_mode(DcxControlMode.LANDED, telem_viz)
 vessel.control.throttle = 0.0
 vessel.auto_pilot.disengage()
 time.sleep(10/dcx.CLOCK_RATE)
@@ -398,3 +434,5 @@ horizontal_dist.plot()
 horizontal_vel.plot()
 pitch_log.plot()
 plt.show()
+enter_control_mode(DcxControlMode.SHUTDOWN, telem_viz)
+time.sleep(1)

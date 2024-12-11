@@ -19,7 +19,7 @@
       "datasource": "Prometheus",
       "fill": 0,
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 8,
         "x": 0,
         "y": 0
@@ -115,7 +115,7 @@
       "datasource": "Prometheus",
       "fill": 1,
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 8,
         "x": 8,
         "y": 0
@@ -221,7 +221,7 @@
       "datasource": "Prometheus",
       "fill": 1,
       "gridPos": {
-        "h": 10,
+        "h": 8,
         "w": 8,
         "x": 16,
         "y": 0
@@ -253,22 +253,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "apoapsis",
+          "expr": "distance_to_pad",
           "format": "time_series",
           "interval": "1s",
           "instant": true,
           "intervalFactor": 1,
-          "legendFormat": "apoapsis",
+          "legendFormat": "distance_to_pad",
           "refId": "A",
           "range": true
         },
         {
-          "expr": "periapsis",
+          "expr": "current_horizontal_velocity",
           "format": "time_series",
           "interval": "1s",
           "instant": true,
           "intervalFactor": 1,
-          "legendFormat": "periapsis",
+          "legendFormat": "current_horizontal_velocity",
           "refId": "B",
           "range": true
         }
@@ -276,7 +276,114 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Orbital Parameters",
+      "title": "Landing Params",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ]
+    },
+
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "fill": 1,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 55,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "repeat": null,
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "distance_pitch",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "distance_pitch",
+          "refId": "F",
+          "range": true
+        },
+        {
+          "expr": "velocity_pitch",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "velocity_pitch",
+          "refId": "G",
+          "range": true
+        },
+        {
+          "expr": "pitch_input",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "pitch_input",
+          "refId": "H",
+          "range": true
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "GNC mode 2a",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -317,10 +424,10 @@
       "datasource": "Prometheus",
       "fill": 1,
       "gridPos": {
-        "h": 10,
-        "w": 30,
-        "x": 0,
-        "y": 10
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 8
       },
       "id": 5,
       "legend": {
@@ -349,9 +456,212 @@
       "steppedLine": false,
       "targets": [
         {
+          "expr": "pitch_input",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "pitch_input",
+          "refId": "E",
+          "range": true
+        },
+        {
+          "expr": "heading_error",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "heading_error",
+          "refId": "F",
+          "range": true
+        },
+        {
+          "expr": "roll",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "roll",
+          "refId": "G",
+          "range": true
+        },
+        {
+          "expr": "roll_input",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "roll_input",
+          "refId": "H",
+          "range": true
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "GNC mode 2b",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ]
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "fill": 1,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 6,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "repeat": null,
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "pitch",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "pitch",
+          "refId": "I",
+          "range": true
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "GNC mode 3",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ]
+    },
+
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "fill": 1,
+      "gridPos": {
+        "h": 5,
+        "w": 30,
+        "x": 0,
+        "y": 16
+      },
+      "id": 7,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "repeat": null,
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
           "expr": "control_mode{} > 0",
           "format": "table",
-          "interval": "1s",
+          "interval": "500ms",
           "instant": true,
           "intervalFactor": 1,
           "legendFormat": "control_mode",
@@ -379,18 +689,16 @@
                   "text": [
                     "PAD",
                     "IGNITION",
-                    "ROLL",
-                    "PITCH_OVER",
-                    "MAX_Q",
-                    "THROTTLE_BUCKET_EXIT",
-                    "MECO_PREP",
-                    "MECO",
-                    "S2_INIT",
-                    "S2_LOOP1",
-                    "S2_LOOP2",
-                    "S2_LOOP3",
-                    "COAST",
-                    "ABORT"
+                    "BURN_TO_ALTITUDE",
+                    "COAST_TO_ALTITUDE",
+                    "VERTICAL_HOLD",
+                    "MODE_1",
+                    "MODE_2",
+                    "MODE_2a",
+                    "MODE_2b",
+                    "MODE_3",
+                    "LANDED",
+                    "SHUTDOWN"
                   ]
                 },
                 "targetField": "control_mode"
@@ -442,7 +750,7 @@
   "refresh": "5s",
   "rows": [],
   "schemaVersion": 16,
-  "tags": ["Overview"],
+  "tags": ["Overview", "DCX"],
   "templating": {
     "list": []
   },
@@ -467,6 +775,6 @@
     ]
   },
   "timezone": "browser",
-  "title": "Test",
+  "title": "DCX Avionics Overview",
   "version": 0
 }

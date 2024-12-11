@@ -30,6 +30,8 @@ class KSPTelemetry:
         self.gauge_metrics = {}
         self.enum_metrics = {}
 
+        self.gnc_debug = os.environ.get('GNC_DEBUG', None) is not None
+
 
 
     def start_metrics_server(self, port: int = 8012):
@@ -64,13 +66,13 @@ class KSPTelemetry:
         self.gauge_metrics[name] = Gauge(name, description)
 
 
-    def publish_gauge_metric(self, name: str, state: str, console_out: bool = False):
+    def publish_gauge_metric(self, name: str, state: float, console_out: bool = False):
         if console_out:
             print(
                 f'{str(datetime.now(UTC).isoformat())} [{name}] {state}')
 
-        if name not in self.enum_metrics:
-            print("WARNING: skipping publish of unknown metric. remember to register it first with register_gauge_metric!")
+        if name not in self.gauge_metrics:
+            print(f"WARNING: skipping publish of unknown metric '{name}'. remember to register it first with register_gauge_metric!")
             return
         try:
             self.gauge_metrics[name].set(state)
@@ -85,7 +87,7 @@ class KSPTelemetry:
     def publish_enum_metric(self, name:str, state: str, display_name: str = None, console_out: bool = True):
 
         if name not in self.enum_metrics:
-            print("WARNING: skipping publish of unknown enum. remember to register it first with register_enum_metric!")
+            print(f"WARNING: skipping publish of unknown enum '{name}'. remember to register it first with register_enum_metric!")
             return
         try:
             self.enum_metrics[name].state(state)
