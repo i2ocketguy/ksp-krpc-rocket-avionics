@@ -442,12 +442,12 @@
   "refresh": "5s",
   "rows": [],
   "schemaVersion": 16,
-  "tags": ["Overview"],
+  "tags": ["Overview", "Orbital", "Minerva", "Maxerva", "Hurley", "F9"],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-15m",
+    "from": "now-2m",
     "to": "now"
   },
   "timepicker": {
@@ -467,6 +467,6 @@
     ]
   },
   "timezone": "browser",
-  "title": "Test",
+  "title": "Orbital Launch Overview",
   "version": 0
 }
