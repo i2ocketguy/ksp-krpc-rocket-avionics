@@ -272,6 +272,10 @@ def dynamic_sleep(actual_frame_time: float):
 g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
 engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
 
+# start async, queue based metrics publisher. this avoids blocking calls to publish metrics from impacting GNC performance
+metric_queue = Queue()
+publisher_thread = threading.Thread(target=telem_viz.metric_publisher, args=(metric_queue,), daemon=True)
+publisher_thread.start()
 
 while vessel.situation != status:
     telem_viz.increment_counter_metric('gnc_frame_count')
@@ -288,7 +292,7 @@ while vessel.situation != status:
         telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
         if int(elapsed_time) > 1:
             vessel.control.throttle = 0.0
-            telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
+            metric_queue.put({'name': 'throttle', 'type': 'gauge', 'value': vessel.control.throttle})
             enter_control_mode(DcxControlMode.MODE_2, telem_viz)
             mode = 2
             vessel.auto_pilot.stopping_time = (0.3, 0.3, 0.3)
@@ -345,12 +349,12 @@ while vessel.situation != status:
 
             if telem_viz.gnc_debug:
                 print(f"Mode 2a Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
-            telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
-            telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
-            telem_viz.publish_gauge_metric('distance_pitch', distance_pitch, False)
-            telem_viz.publish_gauge_metric('velocity_pitch', velocity_pitch, False)
-            telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
-
+            with telem_viz.get_histogram_metric('publish_gnc_metrics_b').time():
+                metric_queue.put({'name':'distance_to_pad', 'type': 'gauge', 'value': distance_to_pad})
+                metric_queue.put({'name':'current_horizontal_velocity', 'type': 'gauge', 'value': current_horizontal_velocity})
+                metric_queue.put({'name':'distance_pitch', 'type': 'gauge', 'value': distance_pitch})
+                metric_queue.put({'name':'velocity_pitch', 'type': 'gauge', 'value': velocity_pitch})
+                metric_queue.put({'name':'pitch_input', 'type': 'gauge', 'value': pitch_input})
 
         else:
             enter_control_mode(DcxControlMode.MODE_2b, telem_viz, False)
@@ -388,14 +392,14 @@ while vessel.situation != status:
                 vessel.auto_pilot.target_roll = roll_input
 
             if telem_viz.gnc_debug:
-                print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel.flight().roll:.2f} {roll_input:.2f}")
+                print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel_flight.roll:.2f} {roll_input:.2f}")
             with telem_viz.get_histogram_metric('publish_gnc_metrics_b').time():
-                telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
-                telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
-                telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
-                telem_viz.publish_gauge_metric('heading_error', heading_error, False)
-                telem_viz.publish_gauge_metric('roll', vessel.flight().roll, False)
-                telem_viz.publish_gauge_metric('roll_input', roll_input, False)
+                metric_queue.put({'name':'distance_to_pad', 'type': 'gauge', 'value': distance_to_pad})
+                metric_queue.put({'name':'current_horizontal_velocity', 'type': 'gauge', 'value': current_horizontal_velocity})
+                metric_queue.put({'name':'pitch_input', 'type': 'gauge', 'value': pitch_input})
+                metric_queue.put({'name':'heading_error', 'type': 'gauge', 'value': heading_error})
+                metric_queue.put({'name':'roll', 'type': 'gauge', 'value': vessel_flight.roll})
+                metric_queue.put({'name':'roll_input', 'type': 'gauge', 'value': roll_input})
 
         if tb > -0.75 and telem.surface_altitude() < 8000 and burn_flag is False:
             vessel.control.throttle = slam_controller.update(tb)
@@ -429,7 +433,7 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
-        telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
+        metric_queue.put({'name': 'throttle', 'type': 'gauge', 'value': vessel.control.throttle})
 
         # Get the vessel's velocity relative to the surface
         v_vec = vessel.flight(ref_frame).velocity
@@ -463,9 +467,10 @@ while vessel.situation != status:
         distance_to_pad = haversine_distance(current_flight.latitude, current_flight.longitude, landing_site[0], landing_site[1])
         if telem_viz.gnc_debug:
             print(f"Mode 3 Outputs: {distance_to_pad:.2f}, {telem.horizontal_vel():2f}, {pitch:.2f}")
-        telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
-        telem_viz.publish_gauge_metric('current_horizontal_velocity', telem.horizontal_vel(), False)
-        telem_viz.publish_gauge_metric('pitch', pitch, False)
+        with telem_viz.get_histogram_metric('publish_gnc_metrics_b').time():
+            metric_queue.put({'name': 'distance_to_pad', 'type': 'gauge', 'value': distance_to_pad})
+            metric_queue.put({'name': 'current_horizontal_velocity', 'type': 'gauge', 'value': vessel_surface_ref.horizontal_speed})
+            metric_queue.put({'name': 'pitch', 'type': 'gauge', 'value': pitch})
 
     if telem.surface_altitude() < 30:
         vessel.control.gear = True

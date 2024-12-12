@@ -2,6 +2,7 @@ import os
 import time
 from datetime import datetime, UTC
 import threading
+from queue import Queue
 
 from prometheus_client import start_http_server, Gauge, Enum, Counter, Histogram
 import psutil
@@ -67,6 +68,32 @@ class KSPTelemetry:
             self.system_cpu_percent.set(psutil.cpu_percent())
 
             time.sleep(1/self.publish_rate_hz)
+
+    # -------------------------------------------------------------
+    # Worker Thread Function
+    # -------------------------------------------------------------
+    def metric_publisher(self, queue: Queue):
+        """
+        Continuously consume metrics from the queue and update Prometheus metrics.
+        """
+        while True:
+            # Block until an item is available
+            metric_data = queue.get()
+            if metric_data is None:
+                # This can be a signal to gracefully stop if you ever need it
+                break
+
+            name = metric_data["name"]
+            type = metric_data["type"]
+            value = metric_data["value"]
+
+            if type == "gauge":
+                self.gauge_metrics[name].set(value)
+            else:
+                print(f"warning: unsupported metric type {type}")
+
+            # Mark this task as done, helpful if you're using join() on the queue
+            queue.task_done()
 
 
     def register_gauge_metric(self, name: str, description: str):
