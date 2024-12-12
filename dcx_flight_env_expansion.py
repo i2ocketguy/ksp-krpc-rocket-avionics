@@ -27,8 +27,17 @@ telem_viz.register_gauge_metric('roll', 'roll')
 telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
 telem_viz.register_gauge_metric('throttle', 'throttle')
+
 telem_viz.register_counter_metric('gnc_frame_count', 'gnc_frame_count')
 telem_viz.register_counter_metric('gnc_overrun_count', 'gnc_overrun_count')
+
+telem_viz.register_histogram_metric('calculate_landing_burn_time', 'calculate_landing_burn_time')
+telem_viz.register_histogram_metric('calculate_heading', 'calculate_heading')
+telem_viz.register_histogram_metric('haversine_distance', 'haversine_distance')
+telem_viz.register_histogram_metric('publish_gnc_metrics_b', 'publish_gnc_metrics_b')
+telem_viz.register_histogram_metric('get_flight_path_angle', 'get_flight_path_angle')
+telem_viz.register_histogram_metric('calc_lb_final_math', 'calc_lb_final_math')
+
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # TODO: 
@@ -71,6 +80,7 @@ def compass_heading(angle):
 def normalize_angle(angle):
     return angle % 360
 
+@telem_viz.get_histogram_metric('haversine_distance').time()
 def haversine_distance(lat1, lon1, lat2, lon2):
     r = 600000
     phi1 = radians(lat1)
@@ -238,6 +248,11 @@ def dynamic_sleep(actual_frame_time: float):
         to_sleep = expected_frame_time - actual_frame_time
         time.sleep(to_sleep / 1e9)
 
+# performance optimization: calculate these static values only once to avoid many RPC calls to KSP game
+g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
+engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
+
+
 while vessel.situation != status:
     telem_viz.increment_counter_metric('gnc_frame_count')
     frame_start_time = time.time_ns()
@@ -268,7 +283,8 @@ while vessel.situation != status:
     
     # Mode 2 is descent and landing burn start calculation
     if mode == 2:
-        tb = steering.calculate_landing_burn_time(vessel)
+        with telem_viz.get_histogram_metric('calculate_landing_burn_time').time():
+            tb = steering.calculate_landing_burn_time(vessel, telem_viz, g, engine_offset)
         if distance_to_pad < 300:
             enter_control_mode(DcxControlMode.MODE_2a, telem_viz, False)
             if vessel.thrust > 0:
@@ -279,7 +295,8 @@ while vessel.situation != status:
 
             # Compute line of sight angle to landing pad
             current_position = (vessel.flight().latitude, vessel.flight().longitude)
-            heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
+            with telem_viz.get_histogram_metric('calculate_heading').time():
+                heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
             # Compute pitch parameter inputs
             distance_to_pad = haversine_distance(current_position[0], current_position[1], landing_site[0], landing_site[1])
@@ -359,12 +376,13 @@ while vessel.situation != status:
 
             if telem_viz.gnc_debug:
                 print(f"Mode 2b Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {heading_error:.1f}, {vessel.flight().roll:.2f} {roll_input:.2f}")
-            telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
-            telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
-            telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
-            telem_viz.publish_gauge_metric('heading_error', heading_error, False)
-            telem_viz.publish_gauge_metric('roll', vessel.flight().roll, False)
-            telem_viz.publish_gauge_metric('roll_input', roll_input, False)
+            with telem_viz.get_histogram_metric('publish_gnc_metrics_b').time():
+                telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
+                telem_viz.publish_gauge_metric('current_horizontal_velocity', current_horizontal_velocity, False)
+                telem_viz.publish_gauge_metric('pitch_input', pitch_input, False)
+                telem_viz.publish_gauge_metric('heading_error', heading_error, False)
+                telem_viz.publish_gauge_metric('roll', vessel.flight().roll, False)
+                telem_viz.publish_gauge_metric('roll_input', roll_input, False)
 
         if telem.surface_altitude() < 120 or telem.vertical_vel() > -5:
             enter_control_mode(DcxControlMode.MODE_3, telem_viz)

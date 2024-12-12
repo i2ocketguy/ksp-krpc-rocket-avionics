@@ -3,7 +3,7 @@ import time
 from datetime import datetime, UTC
 import threading
 
-from prometheus_client import start_http_server, Gauge, Enum, Counter
+from prometheus_client import start_http_server, Gauge, Enum, Counter, Histogram
 import psutil
 
 from mission import Telemetry
@@ -32,6 +32,7 @@ class KSPTelemetry:
         # metrics which come from control system calculations, not krpc streams
         self.gauge_metrics = {}
         self.counter_metrics = {}
+        self.histogram_metrics = {}
         self.enum_metrics = {}
 
         self.gnc_debug = os.environ.get('GNC_DEBUG', None) is not None
@@ -98,6 +99,19 @@ class KSPTelemetry:
             self.counter_metrics[name].inc()
         except Exception as e:
             print(f"ERROR: could not publish counter metric for reason: {str(e)}")
+
+    def register_histogram_metric(self, name: str, description: str):
+        self.histogram_metrics[name] = Histogram(name, description)
+
+
+    def get_histogram_metric(self, name: str):
+        if name not in self.histogram_metrics:
+            print(f"WARNING: skipping publish of unknown histogram metric '{name}'. remember to register it first with register_histogram_metric!")
+            return
+        try:
+            return self.histogram_metrics[name]
+        except Exception as e:
+            print(f"ERROR: could not publish histogram metric for reason: {str(e)}")
 
 
     def register_enum_metric(self, name: str, description: str, states: [str]):

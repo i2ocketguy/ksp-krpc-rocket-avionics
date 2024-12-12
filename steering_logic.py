@@ -158,22 +158,26 @@ def calculate_landing_burn(vessel):
 
     return T
 
-def calculate_landing_burn_time(vessel):
+def get_flight_path_angle(r, v):
+    r_mag = np.linalg.norm(r)
+    v_mag = np.linalg.norm(v)
+    return math.asin(np.dot(r,v)/(r_mag*v_mag))
 
-    def get_flight_path_angle(vessel):
-        r = vessel.position(srf_frame)
-        v = vessel.velocity(srf_frame)
-        r_mag = np.linalg.norm(r)
-        v_mag = np.linalg.norm(v)
-        return math.asin(np.dot(r,v)/(r_mag*v_mag))
 
-    def get_drag(vessel):
-        drag = vessel.flight().drag
-        return math.sqrt(math.pow(drag[0],2) + math.pow(drag[1],2) + math.pow(drag[2],2))
+def _calculate_landing_burn_time(fpa, v_inf, h_inf, ht, g, available_thrust, mass):
+    a = 1
+    b = math.sin(fpa) * (math.pow(v_inf, 2) / (2 * (h_inf - ht) * g))
+    c = -(((math.pow(v_inf, 2) * (1 + math.pow(math.sin(fpa), 2))) / (4 * (h_inf - ht) * g)) + 1)
+    dis = (b * b) - (4 * a * c)
+    aT_g = (-b + math.sqrt(dis)) / (2 * a)
+    a = aT_g * g
+    return 0.95 * (v_inf / a) - (v_inf / (available_thrust / mass))
 
+
+def calculate_landing_burn_time(vessel, telem_viz, g, engine_offset):
     srf_frame = vessel.orbit.body.reference_frame
-    g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
-    engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
+    r = vessel.position(srf_frame)
+    v = vessel.velocity(srf_frame)
     drag_scale = 0.42
 
     #while not landing_burn_flag:
@@ -182,14 +186,10 @@ def calculate_landing_burn_time(vessel):
     h_inf = vessel.flight().surface_altitude + engine_offset
     ht = 20 # target stopping altitude
 
-    fpa = get_flight_path_angle(vessel)
-    a = 1
-    b = math.sin(fpa)*(math.pow(v_inf,2)/(2*(h_inf-ht)*g))
-    c = -(((math.pow(v_inf,2)*(1+math.pow(math.sin(fpa),2)))/(4*(h_inf-ht)*g))+1)
-    dis = (b*b) - (4*a*c)
-    aT_g = (-b + math.sqrt(dis))/(2*a)
-    a = aT_g*g
-    tb = 0.95*(v_inf/a)-(v_inf/(vessel.available_thrust/vessel.mass))
+    with telem_viz.get_histogram_metric('get_flight_path_angle').time():
+        fpa = get_flight_path_angle(r, v)
+    with telem_viz.get_histogram_metric('calc_lb_final_math').time():
+        tb = _calculate_landing_burn_time(fpa, v_inf, h_inf, ht, g, vessel.available_thrust, vessel.mass)
     return tb
             
 def landing_gate(vessel, telem, pid):

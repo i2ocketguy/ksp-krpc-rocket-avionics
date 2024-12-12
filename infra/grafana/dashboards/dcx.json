@@ -810,7 +810,7 @@
       "fill": 1,
       "gridPos": {
         "h": 5,
-        "w": 30,
+        "w": 16,
         "x": 0,
         "y": 16
       },
@@ -902,6 +902,162 @@
         }
       ],
       "type": "state-timeline",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ]
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "Prometheus",
+      "fill": 1,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "id": 8,
+      "legend": {
+        "alignAsTable": false,
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "rightSide": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "repeat": null,
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(calculate_landing_burn_time_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "calculate_landing_burn_time",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(calculate_heading_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "calculate_heading",
+          "refId": "B",
+          "range": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(haversine_distance_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "haversine_distance",
+          "refId": "C",
+          "range": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(publish_gnc_metrics_b_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "publish_gnc_metrics_b",
+          "refId": "D",
+          "range": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(get_flight_path_angle_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "get_flight_path_angle",
+          "refId": "DD",
+          "range": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(calc_lb_final_math_bucket[1s]))",
+          "format": "time_series",
+          "interval": "10ms",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "calc_lb_final_math",
+          "refId": "DDD",
+          "range": true
+        },
+        {
+          "expr": "1 / 50",
+          "format": "time_series",
+          "interval": "1s",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "50 hz frametime",
+          "refId": "E",
+          "range": true
+        },
+        {
+          "expr": "1 / 30",
+          "format": "time_series",
+          "interval": "1s",
+          "instant": false,
+          "intervalFactor": 1,
+          "legendFormat": "30 hz frametime",
+          "refId": "F",
+          "range": true
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "GNC Function time (p95)",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
       "xaxis": {
         "buckets": null,
         "mode": "time",
