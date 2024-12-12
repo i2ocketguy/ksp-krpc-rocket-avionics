@@ -101,7 +101,8 @@ class KSPTelemetry:
             print(f"ERROR: could not publish counter metric for reason: {str(e)}")
 
     def register_histogram_metric(self, name: str, description: str):
-        self.histogram_metrics[name] = Histogram(name, description)
+        custom_buckets = (.001, .005, .01, .02, .025, .033, .05, .075, .1, .25, .5, .75, 1.0, 2.5, 5.0, 7.5, 10.0, float("inf"))
+        self.histogram_metrics[name] = Histogram(name, description, buckets=custom_buckets)
 
 
     def get_histogram_metric(self, name: str):
