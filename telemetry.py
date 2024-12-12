@@ -1,10 +1,10 @@
 import os
-import random
 import time
 from datetime import datetime, UTC
 import threading
 
 from prometheus_client import start_http_server, Gauge, Enum, Counter
+import psutil
 
 from mission import Telemetry
 
@@ -25,6 +25,9 @@ class KSPTelemetry:
         self.vertical_vel = Gauge('vertical_vel', 'vertical_vel in meters per second')
         self.horizontal_vel = Gauge('horizontal_vel', 'horizontal_vel in meters per second')
         self.periapsis = Gauge('periapsis', 'periapsis in meters')
+
+        # host metrics
+        self.system_cpu_percent = Gauge('system_cpu_percent', 'total host CPU usage in percent')
 
         # metrics which come from control system calculations, not krpc streams
         self.gauge_metrics = {}
@@ -59,6 +62,8 @@ class KSPTelemetry:
             self.vertical_vel.set(telemetry.vertical_vel())
             self.horizontal_vel.set(telemetry.horizontal_vel())
             self.periapsis.set(telemetry.periapsis())
+
+            self.system_cpu_percent.set(psutil.cpu_percent())
 
             time.sleep(1/self.publish_rate_hz)
 

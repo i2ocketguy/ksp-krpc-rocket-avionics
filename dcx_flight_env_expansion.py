@@ -262,6 +262,7 @@ while vessel.situation != status:
             vessel.auto_pilot.target_roll = float("NaN")
             print("Exiting altitude hold ...")
             while telem.vertical_vel() > -10:
+                telem_viz.increment_counter_metric('gnc_frame_count')
                 pass
             vessel.auto_pilot.stopping_time = (0.5, 0.3, 0.5)
     
@@ -429,10 +430,10 @@ while vessel.situation != status:
     if int(time.time()) - int(throttle_update) > 5:
         if telem.surface_altitude()-target_alt < 50 and telem.vertical_vel() < -10:
             frame_end_time = time.time_ns()
-            frame_time = frame_end_time - frame_start_time
-            if frame_time > expected_frame_time:
+            actual_frame_time = frame_end_time - frame_start_time
+            if actual_frame_time > expected_frame_time:
                 if telem_viz.gnc_debug:
-                    print(f"Overrun! Time={frame_time} nanos")
+                    print(f"Overrun! Time={actual_frame_time} nanos")
                 telem_viz.increment_counter_metric('gnc_overrun_count')
             continue
             new_throttle_limit = utils.throttle_from_twr(vessel, 0.25)
