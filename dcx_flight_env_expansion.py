@@ -278,6 +278,7 @@ while vessel.situation != status:
             print("Exiting altitude hold ...")
             while telem.vertical_vel() > -10:
                 telem_viz.increment_counter_metric('gnc_frame_count')
+                dynamic_sleep(0)
                 pass
             vessel.auto_pilot.stopping_time = (0.5, 0.3, 0.5)
     
@@ -436,6 +437,8 @@ while vessel.situation != status:
             vessel.auto_pilot.target_heading = heading
             vessel.auto_pilot.target_roll = float('NaN')
 
+        current_flight = vessel.flight()
+        distance_to_pad = haversine_distance(current_flight.latitude, current_flight.longitude, landing_site[0], landing_site[1])
         if telem_viz.gnc_debug:
             print(f"Mode 3 Outputs: {distance_to_pad:.2f}, {telem.horizontal_vel():2f}, {pitch:.2f}")
         telem_viz.publish_gauge_metric('distance_to_pad', distance_to_pad, False)
@@ -449,10 +452,7 @@ while vessel.situation != status:
         if telem.surface_altitude()-target_alt < 50 and telem.vertical_vel() < -10:
             frame_end_time = time.time_ns()
             actual_frame_time = frame_end_time - frame_start_time
-            if actual_frame_time > expected_frame_time:
-                if telem_viz.gnc_debug:
-                    print(f"Overrun! Time={actual_frame_time} nanos")
-                telem_viz.increment_counter_metric('gnc_overrun_count')
+            dynamic_sleep(actual_frame_time)
             continue
             new_throttle_limit = utils.throttle_from_twr(vessel, 0.25)
         elif mode == 5:
