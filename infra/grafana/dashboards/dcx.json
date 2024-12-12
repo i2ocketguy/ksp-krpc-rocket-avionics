@@ -469,7 +469,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "GNC mode 2a",
+      "title": "GNC mode 2a - Target Tracking Close",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -585,7 +585,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "GNC mode 2b",
+      "title": "GNC mode 2b -Target Tracking Far",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -671,7 +671,7 @@
       "thresholds": [],
       "timeFrom": null,
       "timeShift": null,
-      "title": "GNC mode 3",
+      "title": "GNC mode 3 - Final Landing Approach",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -844,7 +844,7 @@
           "expr": "control_mode{} > 0",
           "format": "table",
           "interval": "500ms",
-          "instant": true,
+          "instant": false,
           "intervalFactor": 1,
           "legendFormat": "control_mode",
           "refId": "A",

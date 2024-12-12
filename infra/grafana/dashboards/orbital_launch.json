@@ -352,7 +352,7 @@
           "expr": "control_mode{} > 0",
           "format": "table",
           "interval": "1s",
-          "instant": true,
+          "instant": false,
           "intervalFactor": 1,
           "legendFormat": "control_mode",
           "refId": "A",
