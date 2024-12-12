@@ -26,7 +26,17 @@ telem_viz.register_gauge_metric('roll', 'roll')
 telem_viz.register_gauge_metric('roll_input', 'roll_input')
 telem_viz.register_gauge_metric('pitch', 'pitch (mode 3)')
 telem_viz.register_gauge_metric('throttle', 'throttle')
+
 telem_viz.register_counter_metric('gnc_frame_count', 'gnc_frame_count')
+telem_viz.register_counter_metric('gnc_overrun_count', 'gnc_overrun_count')
+
+telem_viz.register_histogram_metric('calculate_landing_burn_time', 'calculate_landing_burn_time')
+telem_viz.register_histogram_metric('calculate_heading', 'calculate_heading')
+telem_viz.register_histogram_metric('haversine_distance', 'haversine_distance')
+telem_viz.register_histogram_metric('publish_gnc_metrics_b', 'publish_gnc_metrics_b')
+telem_viz.register_histogram_metric('get_flight_path_angle', 'get_flight_path_angle')
+telem_viz.register_histogram_metric('calc_lb_final_math', 'calc_lb_final_math')
+
 enter_control_mode(DcxControlMode.PAD, telem_viz)
 
 # constants
@@ -150,8 +160,18 @@ burn_flag = False
 throttle_datastream = pu.data_stream_plot()
 altitude_datastream = pu.data_stream_plot()
 vertvel_datastream = pu.data_stream_plot()
+expected_frame_time = (1/dcx.CLOCK_RATE) * 1e9
+def dynamic_sleep(actual_frame_time: float):
+    if actual_frame_time > expected_frame_time:
+        if telem_viz.gnc_debug:
+            print(f"Overrun! Time={actual_frame_time:.2f} seconds")
+        telem_viz.increment_counter_metric('gnc_overrun_count')
+    else:
+        to_sleep = expected_frame_time - actual_frame_time
+        time.sleep(to_sleep / 1e9)
 while vessel.situation == status:
     telem_viz.increment_counter_metric('gnc_frame_count')
+    frame_start_time = time.time_ns()
     count = count + 1
     elapsed_time = time.time() - starting_time
 
@@ -260,7 +280,9 @@ while vessel.situation == status:
     altitude_datastream.update_data_stream(elapsed_time, telem.altitude())
     vertvel_datastream.update_data_stream(elapsed_time, telem.vertical_vel())
 
-    time.sleep(1/dcx.CLOCK_RATE)
+    frame_end_time = time.time_ns()
+    frame_time = frame_end_time - frame_start_time
+    dynamic_sleep(frame_time)
 
 enter_control_mode(DcxControlMode.LANDED, telem_viz)
 vessel.control.throttle = 0.0
