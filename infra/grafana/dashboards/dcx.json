@@ -929,12 +929,65 @@
       ]
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "Prometheus",
-      "fill": 1,
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 5,
         "w": 8,
@@ -942,147 +995,126 @@
         "y": 16
       },
       "id": 8,
-      "legend": {
-        "alignAsTable": false,
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "rightSide": false,
-        "show": true,
-        "total": false,
-        "values": false
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       },
-      "lines": true,
-      "linewidth": 1,
-      "links": [],
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "repeat": null,
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(calculate_landing_burn_time_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "calculate_landing_burn_time",
-          "refId": "A",
-          "range": true
+          "range": true,
+          "refId": "A"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(calculate_heading_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "calculate_heading",
-          "refId": "B",
-          "range": true
+          "range": true,
+          "refId": "B"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(haversine_distance_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "haversine_distance",
-          "refId": "C",
-          "range": true
+          "range": true,
+          "refId": "C"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(publish_gnc_metrics_b_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "publish_gnc_metrics_b",
-          "refId": "D",
-          "range": true
+          "range": true,
+          "refId": "D"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(get_flight_path_angle_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "get_flight_path_angle",
-          "refId": "DD",
-          "range": true
+          "range": true,
+          "refId": "DD"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, rate(calc_lb_final_math_bucket[1s]))",
           "format": "time_series",
-          "interval": "10ms",
           "instant": false,
+          "interval": "10ms",
           "intervalFactor": 1,
           "legendFormat": "calc_lb_final_math",
-          "refId": "DDD",
-          "range": true
+          "range": true,
+          "refId": "DDD"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "1 / 50",
           "format": "time_series",
-          "interval": "1s",
           "instant": false,
+          "interval": "1s",
           "intervalFactor": 1,
           "legendFormat": "50 hz frametime",
-          "refId": "E",
-          "range": true
+          "range": true,
+          "refId": "E"
         },
         {
+          "datasource": {
+            "type": "prometheus"
+          },
           "expr": "1 / 30",
           "format": "time_series",
-          "interval": "1s",
           "instant": false,
+          "interval": "1s",
           "intervalFactor": 1,
           "legendFormat": "30 hz frametime",
-          "refId": "F",
-          "range": true
+          "range": true,
+          "refId": "F"
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeShift": null,
       "title": "GNC Function time (p95)",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ]
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",

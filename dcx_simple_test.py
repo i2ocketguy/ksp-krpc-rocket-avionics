@@ -9,6 +9,8 @@ import steering_logic as steering
 from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
+import threading
+from queue import Queue
 
 from launch_utils import DcxControlMode, enter_control_mode
 from telemetry import KSPTelemetry
@@ -281,6 +283,7 @@ while vessel.situation != status:
     telem_viz.increment_counter_metric('gnc_frame_count')
     frame_start_time = time.time_ns()
     elapsed_time = time.time() - starting_time
+    vessel_surface_ref = vessel.flight(ref_frame)
 
     # Mode 1 is hover at target altitude
     if mode == 1:
@@ -289,7 +292,7 @@ while vessel.situation != status:
         vert_vel_setpoint = alt_controller.update(telem.surface_altitude())
         vert_vel_controller.set_point = vert_vel_setpoint
         vessel.control.throttle = vert_vel_controller.update(telem.vertical_vel())
-        telem_viz.publish_gauge_metric('throttle', vessel.control.throttle, False)
+        vessel_surface_ref = vessel.flight(ref_frame)
         if int(elapsed_time) > 1:
             vessel.control.throttle = 0.0
             metric_queue.put({'name': 'throttle', 'type': 'gauge', 'value': vessel.control.throttle})
@@ -305,7 +308,10 @@ while vessel.situation != status:
                 dynamic_sleep(0)
                 pass
             vessel.auto_pilot.stopping_time = (0.5, 0.3, 0.5)
-    
+
+    if mode == 2 or mode == 3:
+        vessel_flight = vessel.flight()
+
     # Mode 2 is descent and landing burn start calculation
     if mode == 2:
         with telem_viz.get_histogram_metric('calculate_landing_burn_time').time():
@@ -319,7 +325,7 @@ while vessel.situation != status:
                 thruster.enabled = True
 
             # Compute line of sight angle to landing pad
-            current_position = (vessel.flight().latitude, vessel.flight().longitude)
+            current_position = (vessel_flight.latitude, vessel_flight.longitude)
             with telem_viz.get_histogram_metric('calculate_heading').time():
                 heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
@@ -331,7 +337,7 @@ while vessel.situation != status:
             pitch_input = distance_pitch + velocity_pitch
 
             # Update heading based on engine thrust status
-            if burn_start_flag is False or abs(vessel.flight(ref_frame).vertical_speed) > 50 :
+            if burn_start_flag is False or abs(vessel_surface_ref.vertical_speed) > 110 :
                 heading += 180
                 if heading > 360:
                     heading -= 360
@@ -359,7 +365,7 @@ while vessel.situation != status:
         else:
             enter_control_mode(DcxControlMode.MODE_2b, telem_viz, False)
             # Compute line of sight angle to landing pad
-            current_position = (vessel.flight().latitude, vessel.flight().longitude)
+            current_position = (vessel_flight.latitude, vessel_flight.longitude)
             heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
             # Compute pitch parameter inputs
@@ -383,7 +389,7 @@ while vessel.situation != status:
             prev_dist = distance_to_pad
 
             # Roll control implementation
-            current_heading = vessel.flight().heading
+            current_heading = vessel_flight.heading
             heading_error = steering.compute_heading_error(current_heading, heading)
             roll_input = -1*roll_controller.update(heading_error)
             if telem.surface_altitude() > 9000:
@@ -436,14 +442,14 @@ while vessel.situation != status:
         metric_queue.put({'name': 'throttle', 'type': 'gauge', 'value': vessel.control.throttle})
 
         # Get the vessel's velocity relative to the surface
-        v_vec = vessel.flight(ref_frame).velocity
+        v_vec = vessel_surface_ref.velocity
         v_mag = np.linalg.norm(v_vec)
 
-        if vessel.flight(ref_frame).horizontal_speed > 1:
+        if vessel_surface_ref.horizontal_speed > 1:
             # Calculate the direction to apply thrust
             retro_vec = -np.array(v_vec) / v_mag
             # Use the PID controller to adjust the pointing vector
-            pitch = hvel_controller.update(vessel.flight(ref_frame).horizontal_speed)
+            pitch = hvel_controller.update(vessel_surface_ref.horizontal_speed)
             # Calculate the heading using atan2 and convert to 0-360 degrees
             heading_raw = degrees(atan2(retro_vec[2], retro_vec[1]))
             if heading_raw < 0:
@@ -458,12 +464,12 @@ while vessel.situation != status:
 
         else:
             pitch = 0
-            heading = vessel.flight(ref_frame).heading
+            heading = vessel_surface_ref.heading
             vessel.auto_pilot.target_pitch = 90
             vessel.auto_pilot.target_heading = heading
             vessel.auto_pilot.target_roll = float('NaN')
 
-        current_flight = vessel.flight()
+        current_flight = vessel_flight
         distance_to_pad = haversine_distance(current_flight.latitude, current_flight.longitude, landing_site[0], landing_site[1])
         if telem_viz.gnc_debug:
             print(f"Mode 3 Outputs: {distance_to_pad:.2f}, {telem.horizontal_vel():2f}, {pitch:.2f}")
