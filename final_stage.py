@@ -1,10 +1,15 @@
 import pid
 import time
 
+from telemetry import KSPTelemetry
+from launch_utils import ControlMode, enter_control_mode
+
 # constants
 CLOCK_RATE = 20  # refresh rate [Hz]
 
-def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=None,target_apo=None, target_periapsis=None):
+def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=None,target_apo=None, target_periapsis=None, telem_viz : KSPTelemetry=None):
+    if telem_viz is not None:
+        enter_control_mode(ControlMode.S2_INIT, telem_viz)
 
     if target_apo == None:
         target_apo = mission.target_apoapsis
@@ -54,7 +59,10 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     '''
     First pitch control loop used to manage apoapsis altitude wrt vertical velocity
     '''
-    print("Entering first control loop.")
+    if telem_viz is not None:
+        enter_control_mode(ControlMode.S2_LOOP1, telem_viz)
+    else:
+        print("Entering first control loop.")
     while telem.vertical_vel() > 0:
         pitch_cmd = pitch_control.update(telem.apoapsis())
         vessel.auto_pilot.target_pitch = pitch_cmd
@@ -65,7 +73,10 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     '''
     Second pitch control loop used to manage vertical velocity
     '''
-    print("Entering second control loop.")
+    if telem_viz is not None:
+        enter_control_mode(ControlMode.S2_LOOP2, telem_viz)
+    else:
+        print("Entering second control loop.")
     while telem.periapsis() < 70*1000:
         rate_control.deadband = 0.5
         pitch_angle = rate_control.update(telem.vertical_vel())
@@ -78,12 +89,17 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
         # if target_periapsis is not None:
         #     if telem.periapsis() > 0.95*target_periapsis:
         #         break
+        if telem_viz is not None:
+            enter_control_mode(ControlMode.S2_LOOP2, telem_viz, False)
         time.sleep(1 / CLOCK_RATE)
 
     '''
     Third pitch control used to manage periapsis to target apoapsis
     '''
-    print("Entering third control loop.")
+    if telem_viz is not None:
+        enter_control_mode(ControlMode.S2_LOOP3, telem_viz)
+    else:
+        print("Entering third control loop.")
     while telem.apoapsis() < target_apo:
         vessel.auto_pilot.target_pitch = 0
         # if telem.apoapsis() > target_apo*1.2:
@@ -92,6 +108,8 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
         # if target_periapsis is not None:
         #     if telem.periapsis() > 0.95*target_periapsis:
         #         break
+        if telem_viz is not None:
+            enter_control_mode(ControlMode.S2_LOOP3, telem_viz, False)
         time.sleep(1 / CLOCK_RATE)
 
     vessel.control.throttle = 0.0
