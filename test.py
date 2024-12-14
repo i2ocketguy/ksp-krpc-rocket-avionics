@@ -65,7 +65,8 @@ def test_hoverslam(conn, vessel):
                                         mission_params.root_vessel)
     
     # landing_site = (-0.09720804982287173, -74.55761822488455) # LC-1
-    landing_site = (0.00248536258708449, -74.712536691836)   # LZ-1
+    # landing_site = (0.00248536258708449, -74.712536691836)   # LZ-1
+    landing_site = (-0.122666607678452, -74.5432488018431)  # LZ-2
 
     # Create the hybrid reference frame
     body = vessel.orbit.body
@@ -86,16 +87,16 @@ def test_hoverslam(conn, vessel):
     vert_vel_controller.set_point = -0.02  # vertical velocity target, m/s
     alt_controller = controllers.PID(0.0, .4, 0.005, 0.0, min_output=-20, max_output=10)
     alt_controller.set_point = telem.apoapsis()
-    slam_controller = controllers.PID(0.0, 1.0, 0.01, 0.0, 0.0, 1.0, deadband=0.005)
-    slam_controller.set_point = 0.5
+    slam_controller = controllers.PID(0.0, 0.5, 0.01, 0.0, 0.0, 1.0, deadband=0.005)
+    slam_controller.set_point = 0.3
     roll_controller = controllers.PID(0.0, 0.1, 0.0, 0.0, -20, 20, rate_limit=0.1)
     roll_controller.set_point = 180.0
 
     vessel.auto_pilot.engage()
     vessel.auto_pilot.auto_tune = True
-    dist_controller = controllers.PID(0.0, 0.025, 0.0, 0.0, -20.0, 20.0, deadband=0.005)
+    dist_controller = controllers.PID(0.0, 0.025, 0.0, 0.0, -20.0, 20.0, velocity_form=False)
     dist_controller.set_point = 0.0
-    hvel_controller = controllers.PID(0.0, 0.5, 0.0, 0.0, -20.0, 20.0, deadband=0.005)
+    hvel_controller = controllers.PID(0.0, 0.5, 0.0, 0.0, -20.0, 20.0, velocity_form=False)
     mode = 2
     status = vessel.situation.landed
     starting_time = time.time()
@@ -128,7 +129,12 @@ def test_hoverslam(conn, vessel):
                 # Compute pitch parameter inputs
                 distance_to_pad = steering.haversine_distance(current_position[0], current_position[1], landing_site[0], landing_site[1])
                 distance_pitch = dist_controller.update(distance_to_pad)
-                current_horizontal_velocity = vel_sign*vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
+                current_horizontal_velocity = vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
+                # Apply velocity sign based on whether moving toward/away from pad
+                if distance_to_pad < prev_dist:
+                    current_horizontal_velocity *= -1  # Moving away from pad
+                prev_dist = distance_to_pad
+
                 velocity_pitch = -hvel_controller.update(current_horizontal_velocity)
                 pitch_input = distance_pitch + velocity_pitch
 
@@ -139,7 +145,7 @@ def test_hoverslam(conn, vessel):
                         heading -= 360
                 
                 vessel.auto_pilot.target_heading = heading
-                vessel.auto_pilot.target_pitch = pitch_lpf(90+pitch_input)
+                vessel.auto_pilot.target_pitch = 90-pitch_input
                 vessel.auto_pilot.target_roll = float('NaN')
 
                 if distance_to_pad > prev_dist:
@@ -149,7 +155,7 @@ def test_hoverslam(conn, vessel):
 
                 prev_dist = distance_to_pad
 
-                print(f"{distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}, {burn_start_flag}, {heading:.2f}")
+                print(f"Mode 2b: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}, {burn_start_flag}, {heading:.2f}")
 
             else:
                 
@@ -159,8 +165,14 @@ def test_hoverslam(conn, vessel):
 
                 # Compute pitch parameter inputs
                 distance_to_pad = steering.haversine_distance(current_position[0], current_position[1], landing_site[0], landing_site[1])
-                distance_pitch = -dist_controller.update(distance_to_pad)
-                current_horizontal_velocity = vel_sign*vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
+                distance_pitch = dist_controller.update(distance_to_pad)
+                current_horizontal_velocity = vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
+
+                # Apply velocity sign based on whether moving toward/away from pad
+                if distance_to_pad < prev_dist:
+                    current_horizontal_velocity *= -1  # Moving away from pad
+                prev_dist = distance_to_pad
+
                 velocity_pitch = -hvel_controller.update(current_horizontal_velocity)
                 pitch_input = distance_pitch + velocity_pitch
 
@@ -171,17 +183,10 @@ def test_hoverslam(conn, vessel):
 
                 # Update control input
                 vessel.auto_pilot.target_heading = heading
-                vessel.auto_pilot.target_pitch = pitch_lpf(90-pitch_input)
+                vessel.auto_pilot.target_pitch = 90-pitch_input
                 vessel.auto_pilot.target_roll = 180+roll_input
 
-                if distance_to_pad > prev_dist:
-                    vel_sign = 1
-                else: # distance_to_pad < prev_dist:
-                    vel_sign = -1
-
-                prev_dist = distance_to_pad
-
-                print(f"{distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}, {roll_input:.2f}")
+                print(f"Mode 2a: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}, {roll_input:.2f}")
 
             if tb > -0.75 and telem.surface_altitude() < 2800 and burn_flag is False:
                 vessel.control.throttle = slam_controller.update(tb)
@@ -242,7 +247,7 @@ def test_hoverslam(conn, vessel):
                 vessel.auto_pilot.target_heading = heading
                 vessel.auto_pilot.target_roll = float('NaN')
 
-            print(f"{distance_to_pad:.2f}, {v_mag:.2f}, {vessel.flight(ref_frame).horizontal_speed:.2f}, {pitch:.2f}")
+            print(f"Mode 3: {distance_to_pad:.2f}, {v_mag:.2f}, {vessel.flight(ref_frame).horizontal_speed:.2f}, {pitch:.2f}")
 
         if int(time.time()) - int(throttle_update) > 5:  
             vert_vel_controller.set_min_output(new_throttle_limit)

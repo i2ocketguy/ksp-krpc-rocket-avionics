@@ -119,8 +119,8 @@ mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   dcx.bref)
 starting_LF = vessel.resources.amount("LiquidFuel")
-target_lat = vessel.flight().latitude
-target_lon = vessel.flight().longitude
+target_lat = 0.00255791525946923
+target_lon = -74.7125325198397
 landing_site = (target_lat, target_lon)
 
 # Create the hybrid reference frame
@@ -147,14 +147,13 @@ vessel.control.sas = True
 vessel.control.rcs = True
 vessel, telem = utils.check_active_vehicle(conn, vessel,
                                            mission_params.root_vessel)
-# time.sleep(100/dcx.CLOCK_RATE)
 vessel.control.toggle_action_group(1)
 vessel.auto_pilot.target_pitch_and_heading(87.0, mission_params.target_heading)
 vessel.auto_pilot.wait()
 vessel.control.gear = False
 
 # Wait until target alititude is achieved
-target_alt = 30000
+target_alt = 67500
 dt = 0.5
 while True:
     #predict future apoapsis
@@ -197,8 +196,8 @@ alt_controller.set_point = telem.apoapsis()
 slam_controller = controllers.PID(0.0, 1, 0.1, 0.0, 0.0, 1.0)
 slam_controller.set_point = 0.3
 roll_controller = controllers.PID(0.0, 0.5, 0.01, 0.0,-20, 20, 1.0)
-dist_controller = controllers.PID(0.0, 0.12, 0.0, 0.0, -250.0, 250.0, velocity_form=False)
-hvel_controller = controllers.PID(0.0, 0.3, 0.3, 0.1, -40.0, 40.0)
+dist_controller = controllers.PID(0.0, 0.09, 0.0, 0.01, -250.0, 250.0, velocity_form=False)
+hvel_controller = controllers.PID(0.0, 0.3, 0.3, 0.1, -40.0, 60.0)
 pad_targeting_pid = controllers.CascadeController(dist_controller, hvel_controller, True)
 
 for thruster in vessel.parts.rcs:
@@ -260,6 +259,11 @@ while vessel.situation != status:
         prev_dist = distance_to_pad
 
         pitch_input = pad_targeting_pid.update(distance_to_pad, current_horizontal_velocity)
+
+        if pitch_input > 0:
+            vessel.control.brakes = True
+        else:
+            vessel.control.brakes = False
 
         # Update control input
         vessel.auto_pilot.target_heading = heading

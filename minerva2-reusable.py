@@ -84,16 +84,13 @@ maxq_thrust_control = controllers.PID(mission_params.max_q,
                                   0.0001,
                                   0.00003,
                                   0.5,
-                                  1.0,
-                                  clamp=mission_params.max_q)
+                                  1.0, velocity_form=False)
 max_accel_thrust_control = controllers.PID(mission_params.max_g, 
                                        0.1,
                                        0.4,
                                        0.05,
                                        0.5,
-                                       1.0,
-                                       deadband=0.001,
-                                       clamp=mission_params.max_g)
+                                       1.0, velocity_form=False)
 
 K1 = 0.1
 K2 = 200
@@ -106,7 +103,7 @@ final_pitch_control = controllers.PID(0.0,
                         Kd,
                         -40,
                         40,
-                        deadband=300)
+                        deadband=300, velocity_form=False)
 
 # Pre-Launch
 vessel.control.sas = True
