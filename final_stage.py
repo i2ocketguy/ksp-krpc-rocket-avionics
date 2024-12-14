@@ -1,4 +1,4 @@
-import pid
+import controllers
 import time
 
 # constants
@@ -15,7 +15,7 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     Ki = 2.0*K1/K2
     Kd = Kp*K2/3.0
     if pid_input is None:
-        pitch_control = pid.PID(0.0,
+        pitch_control = controllers.PID(0.0,
                                 Kp,
                                 Ki,
                                 Kd,
@@ -34,7 +34,7 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     RKp = 0.2*K1
     RKi = 2.0*K1/K2
     RKd = Kp*K2/3.0
-    rate_control = pid.PID(0.0,
+    rate_control = controllers.PID(0.0,
                             RKp,
                             RKi,
                             RKd,

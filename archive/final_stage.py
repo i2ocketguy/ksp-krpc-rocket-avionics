@@ -1,4 +1,4 @@
-import pid
+import controllers
 import time
 
 # constants
@@ -10,8 +10,8 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     if target_apo == None:
         target_apo = mission.target_apoapsis
 
-    if pid is not None:
-        pitch_control = pid.PID(0.001,
+    if controllers is not None:
+        pitch_control = controllers.PID(0.001,
                                 0.0001,
                                 0.0003,
                                 -vessel.flight().pitch,
@@ -28,7 +28,7 @@ def close_loop_guidance(vessel, mission, telem, init_apo, heading, pid_input=Non
     vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch, heading)
     time.sleep(5)
     
-    rate_control = pid.PID(0.06,
+    rate_control = controllers.PID(0.06,
                             0.00001,
                             0.0,
                             -60,

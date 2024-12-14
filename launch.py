@@ -2,7 +2,7 @@ import numpy as np
 import time
 import mission
 import launch_utils as utils
-import pid
+import controllers
 import archive.final_stage as final_stage
 
 # constants
@@ -40,14 +40,14 @@ def launch(conn, vessel, mission_params):
     bref = vessel.orbit.body.reference_frame
     mission_params.target_heading = utils.set_azimuth(
         vessel, mission_params.target_inc, bref)
-    maxq_thrust_control = pid.PID(0.001,
+    maxq_thrust_control = controllers.PID(0.001,
                                   0.0001,
                                   0.00003,
                                   0.5,
                                   1.0,
                                   clamp=mission_params.max_q)
     maxq_thrust_control.set_point = mission_params.max_q
-    max_accel_thrust_control = pid.PID(0.1,
+    max_accel_thrust_control = controllers.PID(0.1,
                                        0.4,
                                        0.05,
                                        0.5,

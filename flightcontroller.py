@@ -4,7 +4,7 @@ import numpy as np
 import threading
 from dataclasses import dataclass
 from typing import Tuple, List, Optional, Literal
-from pid import PID
+from controllers import PID
 import launch_utils as utils
 import mission
 import spacecraft as sc

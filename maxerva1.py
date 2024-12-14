@@ -1,7 +1,7 @@
 import spacecraft as sc
 import launch_utils as utils
 import mission
-import pid
+import controllers
 import time
 import steering_logic as sas
 import numpy as np
@@ -80,14 +80,14 @@ maxerva = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
 mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   maxerva.bref)
-maxq_thrust_control = pid.PID(mission_params.max_q, 
+maxq_thrust_control = controllers.PID(mission_params.max_q, 
                                   0.001,
                                   0.0001,
                                   0.00003,
                                   0.5,
                                   1.0,
                                   clamp=mission_params.max_q) 
-max_accel_thrust_control = pid.PID(mission_params.max_g,
+max_accel_thrust_control = controllers.PID(mission_params.max_g,
                                        0.1,
                                        0.4,
                                        0.05,
@@ -101,7 +101,7 @@ K2 = 200
 Kp = 0.2*K1
 Ki = 2.0*K1/K2
 Kd = Kp*K2/3.0
-final_pitch_control = pid.PID(0.0,
+final_pitch_control = controllers.PID(0.0,
                         Kp,
                         Ki,
                         Kd,

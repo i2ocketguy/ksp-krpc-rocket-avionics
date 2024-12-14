@@ -1,7 +1,7 @@
 import spacecraft as sc
 import launch_utils as utils
 import mission
-import pid
+import controllers
 import time
 import plotting_utils as pu
 import matplotlib.pyplot as plt
@@ -82,18 +82,20 @@ def test_hoverslam(conn, vessel):
     Kp = 0.2*Ku
     Ki = 2.0*Kp/Tu
     Kd = 2.0*Kp/Tu
-    vert_vel_controller = pid.PID(0.0, Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
+    vert_vel_controller = controllers.PID(0.0, Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
     vert_vel_controller.set_point = -0.02  # vertical velocity target, m/s
-    alt_controller = pid.PID(0.0, .4, 0.005, 0.0, min_output=-20, max_output=10)
+    alt_controller = controllers.PID(0.0, .4, 0.005, 0.0, min_output=-20, max_output=10)
     alt_controller.set_point = telem.apoapsis()
-    slam_controller = pid.PID(0.0, 5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
+    slam_controller = controllers.PID(0.0, 1.0, 0.01, 0.0, 0.0, 1.0, deadband=0.005)
     slam_controller.set_point = 0.5
+    roll_controller = controllers.PID(0.0, 0.1, 0.0, 0.0, -20, 20, rate_limit=0.1)
+    roll_controller.set_point = 180.0
 
     vessel.auto_pilot.engage()
     vessel.auto_pilot.auto_tune = True
-    dist_controller = pid.PID(0.0, 0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
+    dist_controller = controllers.PID(0.0, 0.025, 0.0, 0.0, -20.0, 20.0, deadband=0.005)
     dist_controller.set_point = 0.0
-    hvel_controller = pid.PID(0.0, 0.1, 0.01, 0.01, -20.0, 20.0, deadband=0.005)
+    hvel_controller = controllers.PID(0.0, 0.5, 0.0, 0.0, -20.0, 20.0, deadband=0.005)
     mode = 2
     status = vessel.situation.landed
     starting_time = time.time()
@@ -138,6 +140,7 @@ def test_hoverslam(conn, vessel):
                 
                 vessel.auto_pilot.target_heading = heading
                 vessel.auto_pilot.target_pitch = pitch_lpf(90+pitch_input)
+                vessel.auto_pilot.target_roll = float('NaN')
 
                 if distance_to_pad > prev_dist:
                     vel_sign = -1
@@ -156,13 +159,20 @@ def test_hoverslam(conn, vessel):
 
                 # Compute pitch parameter inputs
                 distance_to_pad = steering.haversine_distance(current_position[0], current_position[1], landing_site[0], landing_site[1])
-                distance_pitch = dist_controller.update(distance_to_pad)
+                distance_pitch = -dist_controller.update(distance_to_pad)
                 current_horizontal_velocity = vel_sign*vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
                 velocity_pitch = -hvel_controller.update(current_horizontal_velocity)
                 pitch_input = distance_pitch + velocity_pitch
+
+                # Roll control implementation
+                current_heading = vessel.flight().heading
+                heading_error = steering.compute_heading_error(current_heading, heading)
+                roll_input = 1*roll_controller.update(heading_error)
+
                 # Update control input
                 vessel.auto_pilot.target_heading = heading
                 vessel.auto_pilot.target_pitch = pitch_lpf(90-pitch_input)
+                vessel.auto_pilot.target_roll = 180+roll_input
 
                 if distance_to_pad > prev_dist:
                     vel_sign = 1
@@ -171,7 +181,7 @@ def test_hoverslam(conn, vessel):
 
                 prev_dist = distance_to_pad
 
-                print(f"{distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}")
+                print(f"{distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {distance_pitch:.2f}, {velocity_pitch:.2f}, {pitch_input:.2f}, {roll_input:.2f}")
 
             if tb > -0.75 and telem.surface_altitude() < 2800 and burn_flag is False:
                 vessel.control.throttle = slam_controller.update(tb)
@@ -191,13 +201,13 @@ def test_hoverslam(conn, vessel):
                 Kp = 0.2*Ku
                 Ki = 2.0*Kp/Tu
                 Kd = 0.0*Kp/Tu
-                vert_vel_controller.update_gains(Kp, Ki, Kd)
+                vert_vel_controller.set_gains(0.5, 0, 0)
                 alt_controller.set_point = -5.0
                 alt_controller.set_max_output(-3.0)
                 alt_controller.set_min_output(-10.0)
                 hvel_controller.set_max_output(10.0)
                 hvel_controller.set_min_output(-10.0)
-                hvel_controller.update_gains(1.0, 0.005, 0.01)
+                hvel_controller.set_gains(0.5, 0.0, 0.0)
 
         # Mode 3 is constant descent rate at -5 m/s
         if mode == 3:
@@ -251,7 +261,7 @@ def test_hoverslam(conn, vessel):
 def test_roll_control(conn, vessel):
     landing_site = (-0.09720804982287173, -74.55761822488455)
     status = vessel.situation.landed
-    roll_controller = pid.PID(1.0, 0.0, 0.1,-20, 20, 1.0)
+    roll_controller = controllers.PID(1.0, 0.0, 0.1,-20, 20, 1.0)
     roll_controller.set_point = 0.0
     while vessel.situation != status:
         current_position = (vessel.flight().latitude, vessel.flight().longitude)
@@ -277,9 +287,9 @@ def altitude_controller(conn, vessel):
     Kp = 0.05
     Ki = 0.01
     Kd = 0.1
-    alt_controller = pid.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
+    alt_controller = controllers.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
     alt_controller.set_point = 1000
-    vert_vel_controller = pid.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
+    vert_vel_controller = controllers.PID(Kp, Ki, Kd, min_output=-5, max_output=5)
     vert_vel_controller.set_point = 0.0
     vertical_vel = conn.add_stream(getattr, vessel.flight(vessel.orbit.body.reference_frame), 'vertical_speed')
     while True:

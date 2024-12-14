@@ -1,7 +1,7 @@
 import spacecraft as sc
 import launch_utils as utils
 import mission
-import pid
+import controllers
 import time
 import plotting_utils as pu
 import matplotlib.pyplot as plt
@@ -101,10 +101,10 @@ Ku = 2.5
 Kp = 0.2*Ku
 Ki = 2.0*Kp/Tu
 Kd = 0.0*Kp/Tu
-vert_vel_controller = pid.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
+vert_vel_controller = controllers.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
 vert_vel_controller.set_point = 0.02  # vertical velocity target, m/s
 print(Kp,Ki,Kd)
-alt_controller = pid.PID(.1, 0.005, 0.0, min_output=-20, max_output=10)
+alt_controller = controllers.PID(.1, 0.005, 0.0, min_output=-20, max_output=10)
 alt_controller.set_point = target_alt
 throttle_lpf = LPF(4,3,dcx.CLOCK_RATE)
 
@@ -174,7 +174,7 @@ while vessel.situation == status:
             Kp = 0.2*Ku
             Ki = 2.0*Kp/Tu
             Kd = 0.0*Kp/Tu
-            vert_vel_controller.update_gains(Kp, Ki, Kd)
+            vert_vel_controller.set_gains(Kp, Ki, Kd)
             vert_vel_controller.set_point = -5
             mode = 3
             for thruster in vessel.parts.rcs:
@@ -186,7 +186,7 @@ while vessel.situation == status:
             Kp = 0.2*Ku
             Ki = 2.0*Kp/Tu
             Kd = 0.0*Kp/Tu
-            vert_vel_controller.update_gains(Kp, Ki, Kd)
+            vert_vel_controller.set_gains(Kp, Ki, Kd)
             vert_vel_controller.set_point = -5
             mode = 3
             for thruster in vessel.parts.rcs:

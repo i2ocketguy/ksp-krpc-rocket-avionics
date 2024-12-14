@@ -1,7 +1,7 @@
 import spacecraft as sc
 import launch_utils as utils
 import mission
-import pid
+import controllers
 import time
 import plotting_utils as pu
 import matplotlib.pyplot as plt
@@ -196,18 +196,18 @@ Ku = 2.5
 Kp = 0.2*Ku
 Ki = 2.0*Kp/Tu
 Kd = 2.0*Kp/Tu
-vert_vel_controller = pid.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
+vert_vel_controller = controllers.PID(Kp, Ki, Kd, new_throttle_limit, 1.0, deadband=0.005)
 vert_vel_controller.set_point = -0.02  # vertical velocity target, m/s
-alt_controller = pid.PID(.4, 0.005, 0.0, min_output=-20, max_output=10)
+alt_controller = controllers.PID(.4, 0.005, 0.0, min_output=-20, max_output=10)
 alt_controller.set_point = telem.apoapsis()
-slam_controller = pid.PID(5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
+slam_controller = controllers.PID(5, 0.0, 0.0, 0.0, 1.0, deadband=0.005)
 slam_controller.set_point = 0.5
-roll_controller = pid.PID(1.0, 0.0, 0.1,-20, 20, 1.0)
+roll_controller = controllers.PID(1.0, 0.0, 0.1,-20, 20, 1.0)
 roll_controller.set_point = 0.0
 
-dist_controller = pid.PID(0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
+dist_controller = controllers.PID(0.025, 0.0, 0.3, -20.0, 20.0, deadband=0.005)
 dist_controller.set_point = 0.0
-hvel_controller = pid.PID(0.1, 0.01, 0.01, -20.0, 20.0, deadband=0.005)
+hvel_controller = controllers.PID(0.1, 0.01, 0.01, -20.0, 20.0, deadband=0.005)
 hvel_controller.set_point = 0.0
 
 for thruster in vessel.parts.rcs:
@@ -335,13 +335,13 @@ while vessel.situation != status:
             Kp = 0.2*Ku
             Ki = 2.0*Kp/Tu
             Kd = 0.0*Kp/Tu
-            vert_vel_controller.update_gains(Kp, Ki, Kd)
+            vert_vel_controller.set_gains(Kp, Ki, Kd)
             alt_controller.set_point = -5.0
             alt_controller.set_max_output(-3.0)
             alt_controller.set_min_output(-10.0)
             hvel_controller.set_max_output(5.0)
             hvel_controller.set_min_output(-5.0)
-            hvel_controller.update_gains(0.05, 0.005, 0.01)
+            hvel_controller.set_gains(0.05, 0.005, 0.01)
 
     # Mode 3 is constant descent rate at -5 m/s
     if mode == 3:

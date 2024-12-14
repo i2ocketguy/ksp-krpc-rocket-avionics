@@ -1,6 +1,6 @@
 import launch_utils as utils
 import numpy as np
-import pid
+import controllers
 import time
 
 conn, vessel = utils.initialize()
@@ -52,7 +52,7 @@ target_lat = vessel.flight().latitude
 target_lon = vessel.flight().longitude
 landing_site = (target_lat, target_lon)
 
-yaw_control = pid.PID(1,0,0,0,360)
+yaw_control = controllers.PID(1,0,0,0,360)
 vessel.auto_pilot.engage()
 
 while True:

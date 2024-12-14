@@ -2,7 +2,7 @@ import spacecraft as sc
 import launch_utils as utils
 import mission
 import steering_logic as steering
-import pid
+import controllers
 import time
 import plotting_utils
 
@@ -57,7 +57,7 @@ throttle_limit = utils.throttle_from_twr(vessel, 0.7)
 vessel.control.throttle = throttle_limit
 print(throttle_limit)
 status = vessel.situation
-alt_controller = pid.PID(0.7, 0.35, 0.001, throttle_limit, 1, deadband=0.01)
+alt_controller = controllers.PID(0.7, 0.35, 0.001, throttle_limit, 1, deadband=0.01)
 alt_controller.set_point = 0.02
 start_time = time.time()
 mode = 1

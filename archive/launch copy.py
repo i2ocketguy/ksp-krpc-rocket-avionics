@@ -2,7 +2,7 @@ import numpy as np
 import time
 import mission
 import launch_utils as utils
-import pid
+import controllers
 
 #constants
 CLOCK_RATE = 10 # refresh rate [Hz]
@@ -22,7 +22,7 @@ def launch(conn, vessel, mission_params, telem):
     #initial vehicle setup
     bref = vessel.orbit.body.reference_frame
     mission_params.target_heading = utils.set_azimuth(vessel, mission_params.target_inc, bref)
-    thrust_control = pid.PID(0.001, 0.0001, 0.0, clamp=mission_params.max_q)
+    thrust_control = controllers.PID(0.001, 0.0001, 0.0, clamp=mission_params.max_q)
     thrust_control.set_point = mission_params.max_q
 
     #Pre-Launch
