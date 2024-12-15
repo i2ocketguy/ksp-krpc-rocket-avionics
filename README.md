@@ -34,7 +34,7 @@ A network diagram of expected system interactions follows:
 
 ```mermaid
 
-flowchart TB
+flowchart LR
   
   human((human))
   prometheus[(prometheus)]
