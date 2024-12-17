@@ -3,6 +3,9 @@ import time
 import numpy as np
 import math
 import controllers
+from launch_utils import ControlMode, enter_control_mode
+from telemetry import KSPTelemetry
+
 
 # Consists of functions for steering and controlling a generic launch vehicle.
 # - Pitch Maneuver
@@ -10,10 +13,10 @@ import controllers
 # - MaxQ throttle
 # - constant acceleration
 
-def roll_program(mission_params, telem, vessel, conn, sc):
+def roll_program(mission_params, telem, vessel, conn, sc, telem_viz: KSPTelemetry):
     # roll program after velocity reached based on TWR
     # heading angle
-    print("Entering Roll Program")
+    enter_control_mode(ControlMode.ROLL, telem_viz)
     vessel.auto_pilot.target_pitch_and_heading(89,
                                                mission_params.target_heading)
     vessel.auto_pilot.target_roll = mission_params.target_roll
@@ -21,7 +24,7 @@ def roll_program(mission_params, telem, vessel, conn, sc):
     while telem.velocity() < 20 or telem.surface_altitude() < (
             220 + mission_params.altimeter_bias):
         utils.abort_system(sc.is_abort_installed, sc.abort_criteria, vessel,
-                           mission_params, conn, "KRV Shuttle")
+                           mission_params, conn, "KRV Shuttle", telem_viz)
         pass
 
     # while telem.velocity() < 40 or telem.altitude() < 350 + \
@@ -87,17 +90,17 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
 
         time.sleep(1 / sc.CLOCK_RATE)
 
-def maxQ(mission_params, telem, vessel, maxq_thrust_control):
+def maxQ(mission_params, telem, vessel, maxq_thrust_control, telem_viz: KSPTelemetry = None):
     if vessel.flight().dynamic_pressure >= 10000 and telem.altitude() < 12000:
         vessel.control.throttle = maxq_thrust_control.update(
             vessel.flight().dynamic_pressure)
         if not mission_params.maxq_enter:
-            print("MaxQ - Entering Throttle Bucket")
+            enter_control_mode(ControlMode.MAX_Q, telem_viz)
             mission_params.maxq_enter = True
     elif telem.altitude() >= 12000:
         vessel.control.throttle = 1
         if not mission_params.maxq_exit:
-            print("Exiting MaxQ - Throttle Up 1st Stage")
+            enter_control_mode(ControlMode.THROTTLE_BUCKET_EXIT, telem_viz)
             mission_params.maxq_exit = True
     else:
         vessel.control.throttle = 1
@@ -110,11 +113,13 @@ def max_accel(mission_params, telem, vessel, max_accel_thrust_control):
         vessel.flight().g_force)
 
 
-def meco(vessel, sc):
+def meco(vessel, sc, telem_viz):
     vessel.control.throttle = 0
     time.sleep(10 / sc.CLOCK_RATE)
     vessel.auto_pilot.disengage()
-    print("MECO")
+
+    enter_control_mode(ControlMode.MECO, telem_viz)
+    # print("MECO")
     time.sleep(10 / sc.CLOCK_RATE)
 
 def calculate_landing_burn(vessel):
@@ -153,22 +158,26 @@ def calculate_landing_burn(vessel):
 
     return T
 
-def calculate_landing_burn_time(vessel):
+def get_flight_path_angle(r, v):
+    r_mag = np.linalg.norm(r)
+    v_mag = np.linalg.norm(v)
+    return math.asin(np.dot(r,v)/(r_mag*v_mag))
 
-    def get_flight_path_angle(vessel):
-        r = vessel.position(srf_frame)
-        v = vessel.velocity(srf_frame)
-        r_mag = np.linalg.norm(r)
-        v_mag = np.linalg.norm(v)
-        return math.asin(np.dot(r,v)/(r_mag*v_mag))
 
-    def get_drag(vessel):
-        drag = vessel.flight().drag
-        return math.sqrt(math.pow(drag[0],2) + math.pow(drag[1],2) + math.pow(drag[2],2))
+def _calculate_landing_burn_time(fpa, v_inf, h_inf, ht, g, available_thrust, mass):
+    a = 1
+    b = math.sin(fpa) * (math.pow(v_inf, 2) / (2 * (h_inf - ht) * g))
+    c = -(((math.pow(v_inf, 2) * (1 + math.pow(math.sin(fpa), 2))) / (4 * (h_inf - ht) * g)) + 1)
+    dis = (b * b) - (4 * a * c)
+    aT_g = (-b + math.sqrt(dis)) / (2 * a)
+    a = aT_g * g
+    return 0.95 * (v_inf / a) - (v_inf / (available_thrust / mass))
 
+
+def calculate_landing_burn_time(vessel, telem_viz, g, engine_offset):
     srf_frame = vessel.orbit.body.reference_frame
-    g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
-    engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
+    r = vessel.position(srf_frame)
+    v = vessel.velocity(srf_frame)
     drag_scale = 0.42
 
     #while not landing_burn_flag:
@@ -177,14 +186,10 @@ def calculate_landing_burn_time(vessel):
     h_inf = vessel.flight().surface_altitude + engine_offset
     ht = 20 # target stopping altitude
 
-    fpa = get_flight_path_angle(vessel)
-    a = 1
-    b = math.sin(fpa)*(math.pow(v_inf,2)/(2*(h_inf-ht)*g))
-    c = -(((math.pow(v_inf,2)*(1+math.pow(math.sin(fpa),2)))/(4*(h_inf-ht)*g))+1)
-    dis = (b*b) - (4*a*c)
-    aT_g = (-b + math.sqrt(dis))/(2*a)
-    a = aT_g*g
-    tb = 0.95*(v_inf/a)-(v_inf/(vessel.available_thrust/vessel.mass))
+    with telem_viz.get_histogram_metric('get_flight_path_angle').time():
+        fpa = get_flight_path_angle(r, v)
+    with telem_viz.get_histogram_metric('calc_lb_final_math').time():
+        tb = _calculate_landing_burn_time(fpa, v_inf, h_inf, ht, g, vessel.available_thrust, vessel.mass)
     return tb
             
 def landing_gate(vessel, telem, pid):
