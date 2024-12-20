@@ -153,22 +153,16 @@ def calculate_landing_burn(vessel):
 
     return T
 
-def calculate_landing_burn_time(vessel):
+def get_flight_path_angle(r, v):
 
-    def get_flight_path_angle(vessel):
-        r = vessel.position(srf_frame)
-        v = vessel.velocity(srf_frame)
-        r_mag = np.linalg.norm(r)
-        v_mag = np.linalg.norm(v)
-        return math.asin(np.dot(r,v)/(r_mag*v_mag))
+    r_mag = np.linalg.norm(r)
+    v_mag = np.linalg.norm(v)
+    return math.asin(np.dot(r,v)/(r_mag*v_mag))
 
-    def get_drag(vessel):
-        drag = vessel.flight().drag
-        return math.sqrt(math.pow(drag[0],2) + math.pow(drag[1],2) + math.pow(drag[2],2))
+def calculate_landing_burn_time(vessel, g, engine_offset):
 
     srf_frame = vessel.orbit.body.reference_frame
-    g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
-    engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
+
     drag_scale = 0.42
 
     #while not landing_burn_flag:
@@ -177,7 +171,9 @@ def calculate_landing_burn_time(vessel):
     h_inf = vessel.flight().surface_altitude + engine_offset
     ht = 20 # target stopping altitude
 
-    fpa = get_flight_path_angle(vessel)
+    r = vessel.position(srf_frame)
+    v = vessel.velocity(srf_frame)
+    fpa = get_flight_path_angle(r, v)
     a = 1
     b = math.sin(fpa)*(math.pow(v_inf,2)/(2*(h_inf-ht)*g))
     c = -(((math.pow(v_inf,2)*(1+math.pow(math.sin(fpa),2)))/(4*(h_inf-ht)*g))+1)

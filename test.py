@@ -109,12 +109,14 @@ def test_hoverslam(conn, vessel):
     pitch_lpf = LPF(4,2,CLOCK_RATE)
     prev_dist = 0
     vel_sign = -1
+    g = vessel.orbit.body.gravitational_parameter / (vessel.orbit.body.equatorial_radius * vessel.orbit.body.equatorial_radius)
+    engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
     while vessel.situation != status:
         elapsed_time = time.time() - starting_time
 
         # Mode 2 is descent and landing burn start calculation
         if mode == 2:
-            tb = steering.calculate_landing_burn_time(vessel)
+            tb = steering.calculate_landing_burn_time(vessel, g, engine_offset)
             if telem.surface_altitude() < 3000:
                 if vessel.thrust > 0:
                     burn_start_flag = True
