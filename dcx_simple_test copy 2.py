@@ -10,7 +10,7 @@ from digitalfilter import low_pass_filter as LPF
 import numpy as np
 from math import radians, sin, cos, sqrt, atan2, degrees
 
-# this code is testing the newly implemented CascadingController for the pad targeting control loop
+# this code is testing the glideslope control method
 
 def euler_step(vessel, h, v, dt):
     h = h + v * dt
@@ -153,7 +153,7 @@ vessel.auto_pilot.wait()
 vessel.control.gear = False
 
 # Wait until target alititude is achieved
-target_alt = 67500
+target_alt = 10000
 dt = 0.5
 while True:
     #predict future apoapsis
@@ -200,6 +200,30 @@ dist_controller = controllers.PID(0.0, 0.09, 0.0, 0.01, -250.0, 250.0, velocity_
 hvel_controller = controllers.PID(0.0, 0.3, 0.3, 0.1, -40.0, 60.0)
 pad_targeting_pid = controllers.CascadeController(dist_controller, hvel_controller, True)
 
+# Initialize controllers for two-phase approach
+# Glide slope controller (outer loop controls altitude/distance ratio)
+glide_slope_pid = controllers.PID(
+    set_point=-5.5,  # Targeting roughly 1:2 glide slope (altitude:distance ratio)
+    P=0.1,
+    I=0.01,
+    D=0.05,
+    min_output=-500,  
+    max_output=0
+)
+
+# Vertical speed controller (inner loop)
+vertical_speed_pid = controllers.PID(
+    set_point=0.0,  # Will be set by glide slope controller
+    P=0.2,
+    I=0.0,
+    D=0.1,
+    min_output=-60, # Pitch limits
+    max_output=60
+)
+
+# Create cascade controller for approach path
+approach_controller = controllers.CascadeController(glide_slope_pid, vertical_speed_pid, debug=True)
+
 for thruster in vessel.parts.rcs:
     thruster.enabled = True
 
@@ -215,6 +239,7 @@ vertvel_datastream = pu.data_stream_plot()
 distance_to_pad = 10000
 prev_dist = 0
 vel_sign = -1
+min_transition_altitude = 1000
 g = vessel.orbit.body.gravitational_parameter/(vessel.orbit.body.equatorial_radius*vessel.orbit.body.equatorial_radius)
 engine_offset = (vessel.parts.with_name(vessel.parts.engines[0].part.name)[0].position(vessel.reference_frame))[1]
 while vessel.situation != status:
@@ -252,15 +277,33 @@ while vessel.situation != status:
         heading = compass_heading(np.degrees(corrected_compute_los_angle(current_position, landing_site)))
 
         # Compute pitch parameter inputs
+        altitude = vessel.flight().surface_altitude
         distance_to_pad = haversine_distance(current_position[0], current_position[1], landing_site[0], landing_site[1])
         current_horizontal_velocity = vessel.flight(vessel.orbit.body.reference_frame).horizontal_speed
-        
-        # Apply velocity sign based on whether moving toward/away from pad
-        if distance_to_pad < prev_dist:
-            current_horizontal_velocity *= -1  # Moving away from pad
-        prev_dist = distance_to_pad
 
-        pitch_input = pad_targeting_pid.update(distance_to_pad, current_horizontal_velocity)
+        # Compute current glide slope (altitude/distance ratio)
+        current_glide_slope = altitude / max(distance_to_pad, 1.0)  # Prevent division by zero
+        
+        # Get vertical speed
+        vertical_speed = vessel.flight(vessel.orbit.body.reference_frame).vertical_speed
+        
+        # Update controller gains based on phase
+        if altitude < min_transition_altitude or distance_to_pad < 500:
+            # Terminal phase - more conservative control
+            glide_slope_pid.set_gains(P=0.15, I=0.0, D=0.08)
+            vertical_speed_pid.set_gains(P=0.3, I=0.0, D=0.15)
+        else:
+            # Approach phase - more aggressive control
+            glide_slope_pid.set_gains(P=0.01, I=0.0, D=0.0)
+            vertical_speed_pid.set_gains(P=0.2, I=0.0, D=0.1)
+    
+
+        # Compute desired pitch using cascade controller
+        pitch_input = approach_controller.update(current_glide_slope, vertical_speed)
+        # Debug output
+        # print(f"\rAltitude: {altitude:.1f}m, Distance: {distance_to_pad:.1f}m, "
+        #   f"Glide Slope: {current_glide_slope:.2f}, Pitch: {pitch_input:.1f}", 
+        #   end='')
 
         if pitch_input > 0:
             vessel.control.brakes = True
@@ -269,10 +312,7 @@ while vessel.situation != status:
 
         # Update control input
         vessel.auto_pilot.target_heading = heading
-        if telem.horizontal_vel() > 50 and distance_to_pad < 1500:
-            vessel.auto_pilot.target_pitch = pitch_input
-        else:
-            vessel.auto_pilot.target_pitch = pitch_input
+        vessel.auto_pilot.target_pitch = pitch_input
 
         # Roll control implementation
         current_heading = vessel.flight().heading
@@ -283,7 +323,7 @@ while vessel.situation != status:
         else:
             vessel.auto_pilot.target_roll = 0.0
 
-        print(f"Mode 2 Outputs: {distance_to_pad:.2f}, {current_horizontal_velocity:.2f}, {pitch_input:.2f}, {tb:.2f}")
+        print(f" || Mode 2 Outputs: {distance_to_pad:.2f}, {current_glide_slope:.2f}, {vertical_speed:.2f}, {pitch_input:.2f}, {tb:.2f}")
 
     if mode == 3:
         tb = steering.calculate_landing_burn_time(vessel, g, engine_offset)

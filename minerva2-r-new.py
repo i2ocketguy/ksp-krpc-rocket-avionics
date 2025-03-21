@@ -56,8 +56,8 @@ root_vessel = "Minerva-II-R FR"
 is_abort_installed = False
 abort_criteria = 20  # maximum off-angle before automated abort triggered
 
-upper_stage_LF = 360+720+2*24.3
-payload_LF = 27.0 + 9.9*6 + 2*24.3
+upper_stage_LF = 360+720+2*27
+payload_LF = 405
 
 meco_condition_multiplier = (61.52*5+1400)  # 0 to ignore condition, otherwise set to desired
 #    1st stage liquid fuel per...centage at MECO
@@ -66,11 +66,11 @@ v_stage = 950  # velocity target for 45 degree pitch over
 conn, vessel = utils.initialize()
 mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
-                                           target_inc=-10.0,
+                                           target_inc=0.0,
                                            target_roll=180,
                                            altimeter_bias=96,
                                            grav_turn_end=85000,
-                                           max_q=14000,
+                                           max_q=18000,
                                            max_g=4.0,
                                            v_stage=v_stage)
 minerva = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
@@ -109,21 +109,14 @@ final_pitch_control = controllers.PID(0.0,
 vessel.control.sas = True
 vessel.control.rcs = False
 vessel.control.throttle = 1
-utils.launch_countdown(10, None, vessel) # Countdown + Engine Ignition
-
-# Light engines
-engine_1 = vessel.parts.with_tag("engine_1")[0]
-engine_1.engine.active = True
+utils.launch_countdown(10, 1, vessel) # Countdown + Engine Ignition
 time.sleep(0.05)
-vessel.control.activate_next_stage()  # Outboard Ignition
-engine_2 = vessel.parts.with_tag("engine_2")[0]
-engine_2.engine.active = True
-engine_3 = vessel.parts.with_tag("engine_3")[0]
-engine_3.engine.active = True
+vessel.control.activate_next_stage()  # Outboard Engine Ignition
 time.sleep(0.05)
 
 # Pad Separation
 utils.pad_separation(vessel)
+time.sleep(0.05)
 vessel.control.throttle = 1.0 # think this is needed to help ensure throttle stays at 100%
 vessel = utils.check_active_vehicle_and_control(conn, root_vessel, control_tag="control_point")
 
@@ -159,9 +152,9 @@ time.sleep(0.1)
 second.control.throttle = 1
 second.auto_pilot.stopping_time = (.5, .5, .5)
 second.auto_pilot.target_roll = float("NaN")
+time.sleep(2*50 / CLOCK_RATE)
 second.control.activate_next_stage()  # 2nd stage engine ignition
-time.sleep(4*50 / CLOCK_RATE)
-second.control.activate_next_stage()  # Fairing deployment
+# second.control.activate_next_stage()  # Fairing deployment
 print("Enter closed loop guidance, second stage.")
 second.control.rcs = True
 # second = final_stage.close_loop_guidance(second, mission_params, telem, 120, mission_params.target_heading, pid_input=final_pitch_control)

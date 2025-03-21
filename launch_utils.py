@@ -19,57 +19,54 @@ def initialize_active_vessel(conn):
     return conn.space_center.active_vessel
 
 
-def check_active_vehicle(conn, vessel, root_vessel):
-    print("Checking active vehicle...")
-    checked = conn.space_center.active_vessel
-    print("Current active vehicle is " + checked.name)
-    if checked.name != root_vessel:
-        vessels = conn.space_center.vessels
-        for target_vessel in vessels:
-            if target_vessel.name == root_vessel:
-                # print(target_vessel.name)
-                conn.space_center.active_vessel = target_vessel
-                vessel = conn.space_center.active_vessel
-                print("New active vehicle: " + vessel.name)
-                break
-    else:
-        vessel = checked
-        print("Vessel not changed, active vessel: " + vessel.name)
+def check_active_vehicle(conn, desired_name):
+    """
+    Force the active vessel to be the one with the given name (e.g., "Minerva-II-R FR"),
+    if it is not already. Returns the vessel object. This version tries to do so quickly.
+    """
+    current_vessel = conn.space_center.active_vessel
+    if current_vessel.name == desired_name:
+        return current_vessel  # No change needed
 
-    check_control(conn, vessel, root_vessel)
-    telem = mission.Telemetry(conn, vessel)
-    return vessel, telem
+    # Force set if the active vessel is not correct
+    for v in conn.space_center.vessels:
+        if v.name == desired_name:
+            conn.space_center.active_vessel = v
+            return v
+    
+    # If not found at all, return the current anyway
+    return current_vessel
 
 
-def check_control(conn, vessel, root_vessel):
-    # initialize control systems
-    control_point = vessel.parts.controlling
-    # print("Current control point name is " + vessel.parts.controlling.name)
-    # if control_point.with_module('ModuleCommand') == False:
-    # if 'ModuleCommand' not in [x.name for x in control_point.modules]:
-    #     vessel.parts.controlling = vessel.parts.with_module('ModuleCommand')[0]
-    #     print("Changed control point to " + vessel.parts.controlling.name)
-    #     print("Current control point name is " + vessel.parts.controlling.name)
-    if control_point.tag == "control_point":
-        print("Control point maintained")
-    else:
-        try:
-            part = vessel.parts.with_tag("control_point")[0]
-            vessel.parts.controlling = part
-            print("New control point: %s" % part.name)
-        except:
-            print("PANIC - Control point does not exist")
-            checked = conn.space_center.active_vessel
-            print("Current active vehicle is " + checked.name)
-            if checked.name != root_vessel:
-                vessels = conn.space_center.vessels
-                for target_vessel in vessels:
-                    if target_vessel.name == root_vessel:
-                        # print(target_vessel.name)
-                        conn.space_center.active_vessel = target_vessel
-                        vessel = conn.space_center.active_vessel
-                        print("New active vehicle: " + vessel.name)
-                        break
+def check_vehicle_control(conn, vessel, control_tag="control_point"):
+    """
+    Ensure the vessel is controlled from a part that has the given tag (default "control_point").
+    If not found, it logs a warning. This is performed quickly without extra sleeps.
+    """
+    control_part = vessel.parts.controlling
+    if control_part and control_part.tag == control_tag:
+        # Already controlling from the correct part
+        # print("Control point maintained:", control_part.name)
+        return
+
+    # Otherwise, try to set
+    try:
+        tagged_part = vessel.parts.with_tag(control_tag)[0]
+        vessel.parts.controlling = tagged_part
+        # print("New control point set:", tagged_part.name)
+    except IndexError:
+        # print("WARNING: No control point part found with tag:", control_tag)
+        pass
+
+def check_active_vehicle_and_control(conn, root_vessel_name, control_tag="control_point"):
+    """
+    Wrapper that ensures the active vessel is the rocket (by root_vessel_name)
+    and that it is controlled from the correct control point. Returns the corrected vessel.
+    """
+    vessel = check_active_vehicle(conn, root_vessel_name)
+    # print(vessel.name)
+    check_vehicle_control(conn, vessel, control_tag=control_tag)
+    return vessel
 
 def set_azimuth(vessel, target_incl, bref):
 
@@ -153,6 +150,7 @@ def pad_separation(vessel):
     part = vessel.parts.with_tag("pad_separator")[0]
     part.docking_port.undock()
     print("Lift Off!")
+    time.sleep(0.05)
 
 def abort_system(is_abort_installed, abort_criteria, vessel, mission_params, conn, crew_vehicle):
     if is_abort_installed:

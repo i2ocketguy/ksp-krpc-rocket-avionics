@@ -67,7 +67,7 @@ v_stage = 900  # velocity target for 45 degree pitch over
 conn, vessel = utils.initialize()
 mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
-                                           target_inc=7.0,
+                                           target_inc=0.0,
                                            target_roll=90,
                                            altimeter_bias=96,
                                            grav_turn_end=85000,
@@ -85,16 +85,13 @@ maxq_thrust_control = controllers.PID(mission_params.max_q,
                                   0.0001,
                                   0.00003,
                                   0.5,
-                                  1.0,
-                                  clamp=mission_params.max_q)
+                                  1.0)
 max_accel_thrust_control = controllers.PID(mission_params.max_g,
                                        0.1,
                                        0.4,
                                        0.05,
                                        0.5,
-                                       1.0,
-                                       deadband=0.001,
-                                       clamp=mission_params.max_g)
+                                       1.0)
 
 K1 = 0.1
 K2 = 200
@@ -106,8 +103,7 @@ final_pitch_control = controllers.PID(0.0,
                         Ki,
                         Kd,
                         -40,
-                        40,
-                        deadband=300)
+                        40)
 
 # Pre-Launch
 vessel.control.sas = True
@@ -119,14 +115,14 @@ vessel.control.activate_next_stage()  # Outboard Engine Ignition
 time.sleep(0.5)
 vessel.control.activate_next_stage()  # pad sep
 time.sleep(3)
-vessel, telem = utils.check_active_vehicle(conn, vessel,
-                                               mission_params.root_vessel)
+vessel = utils.check_active_vehicle_and_control(conn, root_vessel, control_tag="control_point")
+
+# Acquire telemetry again, just in case
+telem = mission.Telemetry(conn, vessel)
 
 vessel.auto_pilot.engage()
-# vessel.auto_pilot.stopping_time = (0.1, 0.2, .6)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
                                                vessel.flight().heading)
-# vessel.auto_pilot.auto_tune = True
 vessel.auto_pilot.roll_pid_gains = (10.1, 0.0, 0.0)
 
 sas.roll_program(mission_params, telem, vessel, conn, maxerva)
@@ -134,8 +130,8 @@ pitch_maneuver(meco_condition_multiplier, mission_params, telem, vessel, conn, m
                    maxq_thrust_control, max_accel_thrust_control)
 sas.meco(vessel, maxerva)
 vessel.control.activate_next_stage()  # 2nd stage separation
-second, telem = utils.check_active_vehicle(conn, vessel,
-                                                    mission_params.root_vessel)
+second = utils.check_active_vehicle_and_control(conn, root_vessel, "control_point")
+telem = mission.Telemetry(conn, second)
 vessel.control.sas = True
 time.sleep(2 / CLOCK_RATE)
 second.control.throttle = 1

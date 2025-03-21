@@ -58,7 +58,7 @@ is_abort_installed = False
 abort_criteria = 15  # maximum off-angle before automated abort triggered
 
 upper_stage_LF = 1620*2+24.3*2
-payload_LF = 24.3*9*2*4#+8*24.3+72*2
+payload_LF = 24.3*9*2*4+8*24.3+72*2
 
 meco_condition_multiplier = 680  # 0 to ignore condition, otherwise set to desired
 #    1st stage liquid fuel percentage at MECO
@@ -67,7 +67,7 @@ v_stage = 900  # velocity target for 45 degree pitch over
 conn, vessel = utils.initialize()
 mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
-                                           target_inc=7.0,
+                                           target_inc=0.0,
                                            target_roll=180,
                                            altimeter_bias=103,
                                            grav_turn_end=85000,
@@ -85,16 +85,13 @@ maxq_thrust_control = controllers.PID(mission_params.max_q,
                                   0.0001,
                                   0.00003,
                                   0.5,
-                                  1.0,
-                                  clamp=mission_params.max_q) 
+                                  1.0) 
 max_accel_thrust_control = controllers.PID(mission_params.max_g,
                                        0.1,
                                        0.4,
                                        0.05,
                                        0.5,
-                                       1.0,
-                                       deadband=0.001,
-                                       clamp=mission_params.max_g)
+                                       1.0)
 
 K1 = 0.1
 K2 = 200
@@ -106,8 +103,7 @@ final_pitch_control = controllers.PID(0.0,
                         Ki,
                         Kd,
                         -40,
-                        40,
-                        deadband=300)
+                        40)
 
 # Pre-Launch
 vessel.control.sas = True
@@ -119,14 +115,14 @@ vessel.control.activate_next_stage()  # Outboard Engine Ignition
 time.sleep(0.5)
 vessel.control.activate_next_stage()  # pad sep
 time.sleep(3)
-vessel, telem = utils.check_active_vehicle(conn, vessel,
-                                               mission_params.root_vessel)
+vessel = utils.check_active_vehicle_and_control(conn, root_vessel, control_tag="control_point")
+
+# Acquire telemetry again, just in case
+telem = mission.Telemetry(conn, vessel)
 
 vessel.auto_pilot.engage()
-# vessel.auto_pilot.stopping_time = (0.1, 0.2, .6)
 vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
                                                vessel.flight().heading)
-# vessel.auto_pilot.auto_tune = True
 vessel.auto_pilot.roll_pid_gains = (10.1, 0.0, 0.0)
 
 sas.roll_program(mission_params, telem, vessel, conn, maxerva)
@@ -134,8 +130,8 @@ pitch_maneuver(meco_condition_multiplier, mission_params, telem, vessel, conn, m
                    maxq_thrust_control, max_accel_thrust_control)
 sas.meco(vessel, maxerva)
 vessel.control.activate_next_stage()  # 2nd stage separation
-second, telem = utils.check_active_vehicle(conn, vessel,
-                                                    mission_params.root_vessel)
+second = utils.check_active_vehicle_and_control(conn, root_vessel, "control_point")
+telem = mission.Telemetry(conn, second)
 vessel.control.sas = True
 time.sleep(2*50 / CLOCK_RATE)
 second.control.throttle = 1
@@ -145,10 +141,6 @@ second.control.activate_next_stage()  # 2nd stage engine ignition
 time.sleep(4*50 / CLOCK_RATE)
 second.control.activate_next_stage()  # Fairing deployment
 print("Enter closed loop guidance, second stage.")
-# if vessel.flight().roll >= 90 and vessel.flight().roll <= 270:
-#     mission_params.target_roll = 180
-# else:
-#     mission_params.target_roll = 0
 second.control.rcs = True
 second = final_stage.close_loop_guidance(second, mission_params, telem, 100, mission_params.target_heading, pid_input=final_pitch_control)
 second.auto_pilot.disengage()

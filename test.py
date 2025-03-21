@@ -50,6 +50,7 @@ def test_retrograde_heading(conn, vessel):
         print(desired_heading, np.linalg.norm([velocity_vector[2], velocity_vector[1]]), vessel.flight(ref_frame).horizontal_speed)
 
 def test_hoverslam(conn, vessel):
+   
     CLOCK_RATE = 50  # refresh rate [Hz]
     TELEM_RATE = 1  # refresh rate for telemetry aquistion [Hz]
     root_vessel = vessel.name
@@ -106,9 +107,7 @@ def test_hoverslam(conn, vessel):
     throttle_datastream = pu.data_stream_plot()
     altitude_datastream = pu.data_stream_plot()
     vertvel_datastream = pu.data_stream_plot()
-    pitch_lpf = LPF(4,2,CLOCK_RATE)
     prev_dist = 0
-    vel_sign = -1
     while vessel.situation != status:
         elapsed_time = time.time() - starting_time
 
@@ -147,11 +146,6 @@ def test_hoverslam(conn, vessel):
                 vessel.auto_pilot.target_heading = heading
                 vessel.auto_pilot.target_pitch = 90-pitch_input
                 vessel.auto_pilot.target_roll = float('NaN')
-
-                if distance_to_pad > prev_dist:
-                    vel_sign = -1
-                else: # distance_to_pad < prev_dist:
-                    vel_sign = 1
 
                 prev_dist = distance_to_pad
 
@@ -206,7 +200,7 @@ def test_hoverslam(conn, vessel):
                 Kp = 0.2*Ku
                 Ki = 2.0*Kp/Tu
                 Kd = 0.0*Kp/Tu
-                vert_vel_controller.set_gains(0.5, 0, 0)
+                vert_vel_controller.set_gains(0.5, 0.01, 0)
                 alt_controller.set_point = -5.0
                 alt_controller.set_max_output(-3.0)
                 alt_controller.set_min_output(-10.0)
@@ -239,7 +233,7 @@ def test_hoverslam(conn, vessel):
                 # Set the target direction for the autopilot
                 vessel.auto_pilot.target_pitch = 90+pitch
                 vessel.auto_pilot.target_heading = heading
-                vessel.auto_pilot.target_roll = heading_raw
+                vessel.auto_pilot.target_roll = float('NaN')
             else:
                 pitch = 0
                 heading = vessel.flight(ref_frame).heading

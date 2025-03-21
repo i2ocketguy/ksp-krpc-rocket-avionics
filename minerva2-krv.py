@@ -52,30 +52,30 @@ def pitch_maneuver(prop_meco_condition, mission_params, telem, vessel, conn, sc,
 # constants
 CLOCK_RATE = 50  # refresh rate [Hz]
 TELEM_RATE = 1  # refresh rate for telemetry aquistion [Hz]
-root_vessel = "Minerva-II-R FR"
-is_abort_installed = False
+root_vessel = "KRV"
+is_abort_installed = True
 abort_criteria = 20  # maximum off-angle before automated abort triggered
 
 upper_stage_LF = 360+720+2*24.3
-payload_LF = 27.0 + 9.9*6 + 2*24.3
+payload_LF = 2*24.3 + 45
 
-meco_condition_multiplier = (61.52*5+1400)  # 0 to ignore condition, otherwise set to desired
+meco_condition_multiplier = (61.52*5+1100)  # 0 to ignore condition, otherwise set to desired
 #    1st stage liquid fuel per...centage at MECO
 v_stage = 950  # velocity target for 45 degree pitch over
 
 conn, vessel = utils.initialize()
 mission_params = mission.MissionParameters(root_vessel,
                                            state="init",
-                                           target_inc=-10.0,
+                                           target_inc=0.0,
                                            target_roll=180,
                                            altimeter_bias=96,
                                            grav_turn_end=85000,
-                                           max_q=14000,
-                                           max_g=4.0,
+                                           max_q=16000,
+                                           max_g=3.0,
                                            v_stage=v_stage)
 minerva = sc.launch_vehicle(vessel, CLOCK_RATE, root_vessel,
                         mission_params.altimeter_bias, v_stage, upper_stage_LF,
-                        payload_LF, meco_condition_multiplier)
+                        payload_LF, meco_condition_multiplier, is_abort_installed=is_abort_installed, abort_criteria=abort_criteria)
 mission_params.target_heading = utils.set_azimuth(vessel,
                                                   mission_params.target_inc,
                                                   minerva.bref)
@@ -135,7 +135,7 @@ if vessel.control.throttle < 1.0 and vessel.thrust >= 0.0:
 telem = mission.Telemetry(conn, vessel)
 
 vessel.auto_pilot.engage()
-vessel.auto_pilot.target_pitch_and_heading(vessel.flight().pitch,
+vessel.auto_pilot.target_pitch_and_heading(90.0,
                                                vessel.flight().heading)
 vessel.auto_pilot.roll_pid_gains = (10.1, 0.0, 0.0)
 
@@ -152,19 +152,10 @@ vessel.control.set_action_group(1, True)
 
 # Switch to second stage
 second = utils.check_active_vehicle_and_control(conn, root_vessel, "control_point")
+vessel.control.set_action_group(2, True)
 second.control.sas = True
 second.control.rcs = True
-time.sleep(0.1)
-
 second.control.throttle = 1
 second.auto_pilot.stopping_time = (.5, .5, .5)
 second.auto_pilot.target_roll = float("NaN")
 second.control.activate_next_stage()  # 2nd stage engine ignition
-time.sleep(4*50 / CLOCK_RATE)
-second.control.activate_next_stage()  # Fairing deployment
-print("Enter closed loop guidance, second stage.")
-second.control.rcs = True
-# second = final_stage.close_loop_guidance(second, mission_params, telem, 120, mission_params.target_heading, pid_input=final_pitch_control)
-second.auto_pilot.disengage()
-second.control.sas = True
-second.control.rcs = True
